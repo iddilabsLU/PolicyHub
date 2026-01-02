@@ -4,6 +4,9 @@ PolicyHub Document Detail View
 Displays complete information for a single document with actions.
 """
 
+import os
+import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional
 
 import customtkinter as ctk
@@ -15,11 +18,17 @@ from core.database import DatabaseManager
 from core.permissions import PermissionChecker
 from dialogs.confirm_dialog import ConfirmDialog, InfoDialog
 from dialogs.document_dialog import DocumentDialog
+from dialogs.link_dialog import LinkDialog
+from dialogs.upload_dialog import UploadDialog
+from models.attachment import Attachment
 from models.document import Document
 from models.history import HistoryEntry
+from models.link import DocumentLink
+from services.attachment_service import AttachmentService
 from services.category_service import CategoryService
 from services.document_service import DocumentService
 from services.history_service import HistoryService
+from services.link_service import LinkService, LinkedDocument
 from utils.dates import format_date, format_datetime
 from views.base_view import BaseView
 
@@ -61,6 +70,8 @@ class DocumentDetailView(BaseView):
         self.doc_service = DocumentService(app.db)
         self.history_service = HistoryService(app.db)
         self.category_service = CategoryService(app.db)
+        self.attachment_service = AttachmentService(app.db)
+        self.link_service = LinkService(app.db)
         self.permissions = PermissionChecker()
 
         self._build_ui()
@@ -361,28 +372,414 @@ class DocumentDetailView(BaseView):
         ).pack(anchor="w")
 
     def _build_attachments_tab(self) -> None:
-        """Build the attachments tab (placeholder for Phase 5)."""
+        """Build the attachments tab with upload and list functionality."""
         tab = self.tabview.tab("Attachments")
 
-        placeholder = ctk.CTkLabel(
-            tab,
-            text="Attachment management will be available in a future update.",
-            font=TYPOGRAPHY.body,
-            text_color=COLORS.TEXT_SECONDARY,
+        # Header with upload button
+        header_frame = ctk.CTkFrame(tab, fg_color="transparent", height=50)
+        header_frame.pack(fill="x", padx=10, pady=10)
+        header_frame.pack_propagate(False)
+
+        ctk.CTkLabel(
+            header_frame,
+            text="Attachments",
+            font=TYPOGRAPHY.section_heading,
+            text_color=COLORS.TEXT_PRIMARY,
+        ).pack(side="left")
+
+        # Upload button (editor+)
+        if self.permissions.can_edit():
+            upload_btn = ctk.CTkButton(
+                header_frame,
+                text="+ Upload File",
+                command=self._on_upload_attachment,
+                width=120,
+                height=32,
+            )
+            configure_button_style(upload_btn, "primary")
+            upload_btn.pack(side="right")
+
+        # Scrollable list container
+        self.attachments_scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        self.attachments_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        # Load attachments
+        self._load_attachments()
+
+    def _load_attachments(self) -> None:
+        """Load and display attachments list."""
+        # Clear existing
+        for widget in self.attachments_scroll.winfo_children():
+            widget.destroy()
+
+        attachments = self.attachment_service.get_attachments_for_document(self.document.doc_id)
+
+        if not attachments:
+            ctk.CTkLabel(
+                self.attachments_scroll,
+                text="No attachments uploaded yet.",
+                font=TYPOGRAPHY.body,
+                text_color=COLORS.TEXT_SECONDARY,
+            ).pack(pady=40)
+            return
+
+        # Display each attachment
+        for attachment in attachments:
+            self._create_attachment_row(attachment)
+
+    def _create_attachment_row(self, attachment: Attachment) -> None:
+        """Create a row for an attachment."""
+        row = ctk.CTkFrame(
+            self.attachments_scroll,
+            fg_color=COLORS.MUTED,
+            corner_radius=SPACING.CORNER_RADIUS,
         )
-        placeholder.pack(expand=True)
+        row.pack(fill="x", pady=5)
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=15, pady=12)
+
+        # Left side: file info
+        info_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        info_frame.pack(side="left", fill="x", expand=True)
+
+        # Filename with current badge
+        name_row = ctk.CTkFrame(info_frame, fg_color="transparent")
+        name_row.pack(anchor="w")
+
+        ctk.CTkLabel(
+            name_row,
+            text=attachment.filename,
+            font=TYPOGRAPHY.body,
+            text_color=COLORS.TEXT_PRIMARY,
+        ).pack(side="left")
+
+        if attachment.is_current:
+            current_badge = ctk.CTkLabel(
+                name_row,
+                text="CURRENT",
+                font=TYPOGRAPHY.get_font(10, "bold"),
+                text_color=COLORS.PRIMARY_FOREGROUND,
+                fg_color=COLORS.SUCCESS,
+                corner_radius=4,
+                padx=8,
+                pady=2,
+            )
+            current_badge.pack(side="left", padx=(10, 0))
+
+        # Meta info
+        meta_text = f"v{attachment.version_label} | {attachment.size_display} | {format_datetime(attachment.uploaded_at)}"
+        ctk.CTkLabel(
+            info_frame,
+            text=meta_text,
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_SECONDARY,
+        ).pack(anchor="w")
+
+        # Right side: action buttons
+        actions = ctk.CTkFrame(inner, fg_color="transparent")
+        actions.pack(side="right")
+
+        # Open button
+        open_btn = ctk.CTkButton(
+            actions,
+            text="Open",
+            command=lambda a=attachment: self._on_open_attachment(a),
+            width=70,
+            height=28,
+            font=TYPOGRAPHY.small,
+        )
+        configure_button_style(open_btn, "secondary")
+        open_btn.pack(side="left", padx=5)
+
+        # Delete button (editor+)
+        if self.permissions.can_edit():
+            delete_btn = ctk.CTkButton(
+                actions,
+                text="Delete",
+                command=lambda a=attachment: self._on_delete_attachment(a),
+                width=70,
+                height=28,
+                font=TYPOGRAPHY.small,
+            )
+            configure_button_style(delete_btn, "danger")
+            delete_btn.pack(side="left", padx=5)
+
+    def _on_upload_attachment(self) -> None:
+        """Handle upload attachment button click."""
+        dialog = UploadDialog(
+            self.winfo_toplevel(),
+            doc_ref=self.document.doc_ref,
+            current_version=self.document.version,
+        )
+        result = dialog.show()
+
+        if result:
+            file_path, version_label = result
+            try:
+                self.attachment_service.add_attachment(
+                    doc_id=self.document.doc_id,
+                    doc_ref=self.document.doc_ref,
+                    source_path=file_path,
+                    version_label=version_label,
+                )
+                InfoDialog.show_info(
+                    self.winfo_toplevel(),
+                    "Success",
+                    f"File '{file_path.name}' uploaded successfully.",
+                )
+                self._load_attachments()
+                self._load_history()
+            except PermissionError as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Permission Denied", str(e))
+            except ValueError as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Upload Error", str(e))
+            except Exception as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Error", f"Failed to upload: {str(e)}")
+
+    def _on_open_attachment(self, attachment: Attachment) -> None:
+        """Handle open attachment button click."""
+        file_path = self.attachment_service.open_attachment(attachment.attachment_id)
+
+        if file_path and file_path.exists():
+            try:
+                # Open file with default application (Windows)
+                os.startfile(str(file_path))
+            except Exception as e:
+                InfoDialog.show_error(
+                    self.winfo_toplevel(),
+                    "Error",
+                    f"Failed to open file: {str(e)}",
+                )
+        else:
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "File Not Found",
+                "The attachment file could not be found.",
+            )
+
+    def _on_delete_attachment(self, attachment: Attachment) -> None:
+        """Handle delete attachment button click."""
+        if ConfirmDialog.ask_delete(
+            self.winfo_toplevel(),
+            item_name=attachment.filename,
+            item_type="attachment",
+        ):
+            try:
+                self.attachment_service.delete_attachment(attachment.attachment_id)
+                InfoDialog.show_info(
+                    self.winfo_toplevel(),
+                    "Deleted",
+                    f"Attachment '{attachment.filename}' has been deleted.",
+                )
+                self._load_attachments()
+                self._load_history()
+            except PermissionError as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Permission Denied", str(e))
+            except Exception as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Error", str(e))
 
     def _build_links_tab(self) -> None:
-        """Build the linked documents tab (placeholder for Phase 5)."""
+        """Build the linked documents tab with link management."""
         tab = self.tabview.tab("Linked Documents")
 
-        placeholder = ctk.CTkLabel(
-            tab,
-            text="Document linking will be available in a future update.",
-            font=TYPOGRAPHY.body,
+        # Header with add link button
+        header_frame = ctk.CTkFrame(tab, fg_color="transparent", height=50)
+        header_frame.pack(fill="x", padx=10, pady=10)
+        header_frame.pack_propagate(False)
+
+        ctk.CTkLabel(
+            header_frame,
+            text="Linked Documents",
+            font=TYPOGRAPHY.section_heading,
+            text_color=COLORS.TEXT_PRIMARY,
+        ).pack(side="left")
+
+        # Add link button (editor+)
+        if self.permissions.can_edit():
+            add_link_btn = ctk.CTkButton(
+                header_frame,
+                text="+ Add Link",
+                command=self._on_add_link,
+                width=100,
+                height=32,
+            )
+            configure_button_style(add_link_btn, "primary")
+            add_link_btn.pack(side="right")
+
+        # Scrollable list container
+        self.links_scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        self.links_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        # Load links
+        self._load_links()
+
+    def _load_links(self) -> None:
+        """Load and display document links."""
+        # Clear existing
+        for widget in self.links_scroll.winfo_children():
+            widget.destroy()
+
+        links = self.link_service.get_links_for_document(self.document.doc_id)
+
+        if not links:
+            ctk.CTkLabel(
+                self.links_scroll,
+                text="No linked documents.",
+                font=TYPOGRAPHY.body,
+                text_color=COLORS.TEXT_SECONDARY,
+            ).pack(pady=40)
+            return
+
+        # Display each link
+        for linked_doc in links:
+            self._create_link_row(linked_doc)
+
+    def _create_link_row(self, linked_doc: LinkedDocument) -> None:
+        """Create a row for a linked document."""
+        row = ctk.CTkFrame(
+            self.links_scroll,
+            fg_color=COLORS.MUTED,
+            corner_radius=SPACING.CORNER_RADIUS,
+        )
+        row.pack(fill="x", pady=5)
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=15, pady=12)
+
+        # Left side: link info
+        info_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        info_frame.pack(side="left", fill="x", expand=True)
+
+        # Relationship text
+        relationship = linked_doc.link.get_relationship_text(linked_doc.is_parent)
+        rel_text = f"{relationship}:"
+
+        rel_label = ctk.CTkLabel(
+            info_frame,
+            text=rel_text,
+            font=TYPOGRAPHY.small,
             text_color=COLORS.TEXT_SECONDARY,
         )
-        placeholder.pack(expand=True)
+        rel_label.pack(anchor="w")
+
+        # Document reference and title
+        doc_row = ctk.CTkFrame(info_frame, fg_color="transparent")
+        doc_row.pack(anchor="w")
+
+        ref_label = ctk.CTkLabel(
+            doc_row,
+            text=linked_doc.doc_ref,
+            font=TYPOGRAPHY.get_font(13, "bold"),
+            text_color=COLORS.PRIMARY,
+            cursor="hand2",
+        )
+        ref_label.pack(side="left")
+        ref_label.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
+
+        # Title
+        title_text = f" - {linked_doc.title[:50]}" + ("..." if len(linked_doc.title) > 50 else "")
+        title_label = ctk.CTkLabel(
+            doc_row,
+            text=title_text,
+            font=TYPOGRAPHY.body,
+            text_color=COLORS.TEXT_PRIMARY,
+        )
+        title_label.pack(side="left")
+
+        # Right side: action buttons
+        actions = ctk.CTkFrame(inner, fg_color="transparent")
+        actions.pack(side="right")
+
+        # Delete button (editor+)
+        if self.permissions.can_edit():
+            delete_btn = ctk.CTkButton(
+                actions,
+                text="Remove",
+                command=lambda ld=linked_doc: self._on_remove_link(ld),
+                width=80,
+                height=28,
+                font=TYPOGRAPHY.small,
+            )
+            configure_button_style(delete_btn, "danger")
+            delete_btn.pack(side="left", padx=5)
+
+    def _on_add_link(self) -> None:
+        """Handle add link button click."""
+        dialog = LinkDialog(
+            self.winfo_toplevel(),
+            self.app.db,
+            source_doc_id=self.document.doc_id,
+            source_doc_ref=self.document.doc_ref,
+        )
+        result = dialog.show()
+
+        if result:
+            target_doc_id, link_type = result
+            try:
+                self.link_service.create_link(
+                    parent_doc_id=self.document.doc_id,
+                    child_doc_id=target_doc_id,
+                    link_type=link_type,
+                )
+                InfoDialog.show_info(
+                    self.winfo_toplevel(),
+                    "Success",
+                    "Document link created successfully.",
+                )
+                self._load_links()
+                self._load_history()
+            except PermissionError as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Permission Denied", str(e))
+            except ValueError as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Error", str(e))
+            except Exception as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Error", f"Failed to create link: {str(e)}")
+
+    def _on_click_linked_doc(self, linked_doc: LinkedDocument) -> None:
+        """Handle click on linked document reference to navigate to it."""
+        # Get the linked document ID
+        if linked_doc.is_parent:
+            # This doc is parent, linked doc is child
+            target_doc_id = linked_doc.link.child_doc_id
+        else:
+            # This doc is child, linked doc is parent
+            target_doc_id = linked_doc.link.parent_doc_id
+
+        # Get the full document
+        target_doc = self.doc_service.get_document_by_id(target_doc_id)
+        if target_doc:
+            # Navigate to the linked document
+            # This will trigger the main view to show the document detail
+            if hasattr(self.app, 'main_view') and hasattr(self.app.main_view, '_show_document_detail'):
+                self.app.main_view._show_document_detail(target_doc)
+            else:
+                InfoDialog.show_info(
+                    self.winfo_toplevel(),
+                    "Navigate",
+                    f"Document: {linked_doc.doc_ref}",
+                )
+
+    def _on_remove_link(self, linked_doc: LinkedDocument) -> None:
+        """Handle remove link button click."""
+        if ConfirmDialog.ask_confirm(
+            self.winfo_toplevel(),
+            "Remove Link",
+            f"Remove link to {linked_doc.doc_ref}?",
+        ):
+            try:
+                self.link_service.delete_link(linked_doc.link.link_id)
+                InfoDialog.show_info(
+                    self.winfo_toplevel(),
+                    "Removed",
+                    "Link has been removed.",
+                )
+                self._load_links()
+                self._load_history()
+            except PermissionError as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Permission Denied", str(e))
+            except Exception as e:
+                InfoDialog.show_error(self.winfo_toplevel(), "Error", str(e))
 
     def _build_history_tab(self) -> None:
         """Build the history tab showing audit trail."""

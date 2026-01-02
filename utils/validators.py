@@ -178,6 +178,10 @@ def validate_doc_ref(ref: str) -> Tuple[bool, str]:
     return True, ""
 
 
+# Alias for compatibility
+validate_document_ref = validate_doc_ref
+
+
 def validate_document_title(title: str) -> Tuple[bool, str]:
     """
     Validate a document title.

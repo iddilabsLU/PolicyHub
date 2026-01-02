@@ -5,6 +5,7 @@ Main application view shown after successful login.
 Contains the sidebar navigation and content area with view switching.
 """
 
+import logging
 from typing import TYPE_CHECKING, Dict, Optional
 
 import customtkinter as ctk
@@ -21,6 +22,8 @@ from views.base_view import BaseView
 
 if TYPE_CHECKING:
     from app.application import PolicyHubApp
+
+logger = logging.getLogger(__name__)
 
 
 class MainView(BaseView):
@@ -221,57 +224,73 @@ class MainView(BaseView):
             filter_type: Optional filter to apply (for register)
             review_status: Optional review status filter (for register)
         """
-        # Hide current view
-        if self._current_view_name and self._current_view_name in self.content_views:
-            current = self.content_views[self._current_view_name]
-            current.on_hide()
-            current.pack_forget()
+        try:
+            # Hide current view
+            if self._current_view_name and self._current_view_name in self.content_views:
+                current = self.content_views[self._current_view_name]
+                current.on_hide()
+                current.pack_forget()
 
-        # Create view if needed
-        if view_name not in self.content_views:
-            self._create_content_view(view_name)
+            # Create view if needed
+            if view_name not in self.content_views:
+                self._create_content_view(view_name)
 
-        # Show new view
-        if view_name in self.content_views:
-            view = self.content_views[view_name]
-            view.pack(in_=self.content, fill="both", expand=True)
+            # Show new view
+            if view_name in self.content_views:
+                view = self.content_views[view_name]
+                view.pack(in_=self.content, fill="both", expand=True)
 
-            # Apply filters if provided (for register view)
-            if view_name == "register" and hasattr(view, "apply_filter"):
-                if filter_type or review_status:
-                    view.apply_filter(filter_type=filter_type, review_status=review_status)
+                # Apply filters if provided (for register view)
+                if view_name == "register" and hasattr(view, "apply_filter"):
+                    if filter_type or review_status:
+                        view.apply_filter(filter_type=filter_type, review_status=review_status)
 
-            view.on_show()
-            self._current_view_name = view_name
-            self._update_nav_button_states()
+                view.on_show()
+                self._current_view_name = view_name
+                self._update_nav_button_states()
+        except Exception as e:
+            logger.exception(f"Error switching to view '{view_name}': {e}")
+            self._show_error_view(f"Failed to load {view_name} view: {str(e)}")
 
     def _create_content_view(self, view_name: str) -> None:
         """Create a content view by name."""
-        if view_name == "dashboard":
-            from views.dashboard_view import DashboardView
-            self.content_views[view_name] = DashboardView(self.content, self.app)
+        try:
+            if view_name == "dashboard":
+                from views.dashboard_view import DashboardView
+                logger.info("Creating DashboardView...")
+                self.content_views[view_name] = DashboardView(self.content, self.app)
+                logger.info("DashboardView created successfully")
 
-        elif view_name == "register":
-            from views.register_view import RegisterView
-            self.content_views[view_name] = RegisterView(self.content, self.app)
+            elif view_name == "register":
+                from views.register_view import RegisterView
+                logger.info("Creating RegisterView...")
+                self.content_views[view_name] = RegisterView(self.content, self.app)
+                logger.info("RegisterView created successfully")
 
-        elif view_name == "reports":
-            # Placeholder
-            self.content_views[view_name] = self._create_placeholder_view(
-                "Reports",
-                "Report generation will be available in a future update."
+            elif view_name == "reports":
+                # Placeholder
+                self.content_views[view_name] = self._create_placeholder_view(
+                    "Reports",
+                    "Report generation will be available in a future update."
+                )
+
+            elif view_name == "settings":
+                # Placeholder
+                self.content_views[view_name] = self._create_placeholder_view(
+                    "Settings",
+                    "Settings management will be available in a future update."
+                )
+
+            elif view_name == "document_detail":
+                # Document detail view is created dynamically with a document
+                pass
+        except Exception as e:
+            logger.exception(f"Error creating view '{view_name}': {e}")
+            # Create an error view instead
+            self.content_views[view_name] = self._create_error_view(
+                view_name,
+                f"Failed to initialize: {str(e)}"
             )
-
-        elif view_name == "settings":
-            # Placeholder
-            self.content_views[view_name] = self._create_placeholder_view(
-                "Settings",
-                "Settings management will be available in a future update."
-            )
-
-        elif view_name == "document_detail":
-            # Document detail view is created dynamically with a document
-            pass
 
     def _create_placeholder_view(self, title: str, message: str) -> BaseView:
         """Create a placeholder view for unimplemented features."""
@@ -312,6 +331,75 @@ class MainView(BaseView):
         msg_label.place(relx=0.5, rely=0.5, anchor="center")
 
         return view
+
+    def _create_error_view(self, view_name: str, error_message: str) -> BaseView:
+        """Create an error view when a view fails to load."""
+        view = BaseView(self.content, self.app)
+
+        # Header
+        header = ctk.CTkFrame(view, fg_color=COLORS.DANGER_BG, height=60)
+        header.pack(fill="x", padx=SPACING.WINDOW_PADDING, pady=SPACING.WINDOW_PADDING)
+        header.pack_propagate(False)
+
+        title_label = ctk.CTkLabel(
+            header,
+            text=f"Error Loading {view_name.title()}",
+            font=TYPOGRAPHY.window_title,
+            text_color=COLORS.DANGER,
+        )
+        title_label.pack(side="left", padx=SPACING.CARD_PADDING, pady=SPACING.CARD_PADDING)
+
+        # Content
+        content = ctk.CTkFrame(
+            view,
+            fg_color=COLORS.CARD,
+            corner_radius=SPACING.CORNER_RADIUS_LARGE,
+        )
+        content.pack(
+            fill="both",
+            expand=True,
+            padx=SPACING.WINDOW_PADDING,
+            pady=(0, SPACING.WINDOW_PADDING),
+        )
+
+        error_label = ctk.CTkLabel(
+            content,
+            text=f"Error: {error_message}\n\nCheck the log file for more details.",
+            font=TYPOGRAPHY.body,
+            text_color=COLORS.DANGER,
+            wraplength=500,
+        )
+        error_label.place(relx=0.5, rely=0.5, anchor="center")
+
+        return view
+
+    def _show_error_view(self, error_message: str) -> None:
+        """Show an error message in the content area."""
+        # Clear existing views
+        for widget in self.content.winfo_children():
+            widget.destroy()
+
+        # Create error display
+        error_frame = ctk.CTkFrame(
+            self.content,
+            fg_color=COLORS.DANGER_BG,
+            corner_radius=SPACING.CORNER_RADIUS_LARGE,
+        )
+        error_frame.pack(
+            fill="both",
+            expand=True,
+            padx=SPACING.WINDOW_PADDING,
+            pady=SPACING.WINDOW_PADDING,
+        )
+
+        error_label = ctk.CTkLabel(
+            error_frame,
+            text=f"Error: {error_message}\n\nCheck the log file for more details.",
+            font=TYPOGRAPHY.body,
+            text_color=COLORS.DANGER,
+            wraplength=500,
+        )
+        error_label.place(relx=0.5, rely=0.5, anchor="center")
 
     def _show_document_detail(self, document: Document) -> None:
         """

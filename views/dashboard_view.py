@@ -90,7 +90,7 @@ class DashboardView(BaseView):
         section_title = ctk.CTkLabel(
             self.content,
             text="Document Statistics",
-            font=TYPOGRAPHY.section_title,
+            font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_PRIMARY,
         )
         section_title.pack(anchor="w", pady=(0, 10))
@@ -176,7 +176,7 @@ class DashboardView(BaseView):
         section_title = ctk.CTkLabel(
             self.content,
             text="Review Status Overview",
-            font=TYPOGRAPHY.section_title,
+            font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_PRIMARY,
         )
         section_title.pack(anchor="w", pady=(10, 10))
@@ -273,7 +273,7 @@ class DashboardView(BaseView):
         section_title = ctk.CTkLabel(
             header_frame,
             text="Requires Attention",
-            font=TYPOGRAPHY.section_title,
+            font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_PRIMARY,
         )
         section_title.pack(side="left")

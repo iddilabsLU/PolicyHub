@@ -152,6 +152,8 @@ class HistoryAction(str, Enum):
     REVIEWED = "REVIEWED"
     ATTACHMENT_ADDED = "ATTACHMENT_ADDED"
     ATTACHMENT_REMOVED = "ATTACHMENT_REMOVED"
+    LINK_ADDED = "LINK_ADDED"
+    LINK_REMOVED = "LINK_REMOVED"
 
 
 # Default categories (from PRD Section 7.2)

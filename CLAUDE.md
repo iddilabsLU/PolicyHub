@@ -168,7 +168,9 @@ policyhub/
 │   ├── user_service.py        # User CRUD
 │   ├── document_service.py    # Document CRUD with audit logging
 │   ├── category_service.py    # Category CRUD
-│   └── history_service.py     # Audit trail logging
+│   ├── history_service.py     # Audit trail logging
+│   ├── attachment_service.py  # File attachment management
+│   └── link_service.py        # Document linking
 ├── components/
 │   ├── status_badge.py        # Status badge component
 │   ├── stat_card.py           # Statistics card component
@@ -176,7 +178,9 @@ policyhub/
 ├── dialogs/
 │   ├── base_dialog.py         # Base modal dialog class
 │   ├── confirm_dialog.py      # Yes/No confirmation dialog
-│   └── document_dialog.py     # Add/Edit document form
+│   ├── document_dialog.py     # Add/Edit document form
+│   ├── upload_dialog.py       # File upload dialog
+│   └── link_dialog.py         # Document linking dialog
 ├── views/
 │   ├── base_view.py           # BaseView, CenteredView, ScrollableView
 │   ├── setup_view.py          # Folder selection wizard
@@ -197,7 +201,9 @@ policyhub/
     ├── test_database.py       # Database tests
     ├── test_document_service.py # Document service tests
     ├── test_category_service.py # Category service tests
-    └── test_history_service.py  # History service tests
+    ├── test_history_service.py  # History service tests
+    ├── test_attachment_service.py # Attachment service tests
+    └── test_link_service.py   # Link service tests
 ```
 
 ## Running the Application
@@ -245,11 +251,18 @@ pyinstaller --name PolicyHub --onefile --windowed main.py
 - [x] MainView with view switching
 - [x] Add/Edit document dialog
 - [x] Mark as reviewed workflow
-- [x] Service tests (88 total tests)
 
-### Pending (Phase 5+)
-- [ ] Attachment upload/download
-- [ ] Document linking UI
+### Completed (Phase 5 - Attachments & Links)
+- [x] AttachmentService (upload, version tracking, validation)
+- [x] UploadDialog (file browser, validation, version label)
+- [x] Attachments Tab UI (list, upload, open, delete)
+- [x] LinkService (create, delete, bidirectional relationships)
+- [x] LinkDialog (search, link type selection)
+- [x] Links Tab UI (list, add, navigate, remove)
+- [x] History logging for attachments and links
+- [x] Service tests (111 total tests)
+
+### Pending (Phase 6+)
 - [ ] Reports generation (PDF/Excel)
 - [ ] Settings views (categories, company settings)
 - [ ] Full user management UI

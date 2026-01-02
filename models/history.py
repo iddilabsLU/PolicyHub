@@ -50,6 +50,8 @@ class HistoryEntry:
                 HistoryAction.REVIEWED: "Reviewed",
                 HistoryAction.ATTACHMENT_ADDED: "Attachment Added",
                 HistoryAction.ATTACHMENT_REMOVED: "Attachment Removed",
+                HistoryAction.LINK_ADDED: "Link Added",
+                HistoryAction.LINK_REMOVED: "Link Removed",
             }
             return names.get(action_enum, self.action)
         except ValueError:
@@ -73,6 +75,12 @@ class HistoryEntry:
 
         if self.action == HistoryAction.ATTACHMENT_REMOVED.value:
             return f"Attachment removed: {self.old_value or 'file'}"
+
+        if self.action == HistoryAction.LINK_ADDED.value:
+            return f"Link added: {self.new_value or 'document'}"
+
+        if self.action == HistoryAction.LINK_REMOVED.value:
+            return f"Link removed: {self.old_value or 'document'}"
 
         if self.field_changed:
             if self.old_value and self.new_value:

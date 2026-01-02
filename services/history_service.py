@@ -229,6 +229,52 @@ class HistoryService:
             old_value=filename,
         )
 
+    def log_link_added(
+        self,
+        doc_id: str,
+        linked_doc_ref: str,
+        link_type: str,
+    ) -> HistoryEntry:
+        """
+        Log that a document link was added.
+
+        Args:
+            doc_id: Document ID
+            linked_doc_ref: Reference of the linked document
+            link_type: Type of link (IMPLEMENTS, REFERENCES, SUPERSEDES)
+
+        Returns:
+            Created HistoryEntry
+        """
+        return self.log_action(
+            doc_id=doc_id,
+            action=HistoryAction.LINK_ADDED,
+            new_value=f"{link_type}: {linked_doc_ref}",
+        )
+
+    def log_link_removed(
+        self,
+        doc_id: str,
+        linked_doc_ref: str,
+        link_type: str,
+    ) -> HistoryEntry:
+        """
+        Log that a document link was removed.
+
+        Args:
+            doc_id: Document ID
+            linked_doc_ref: Reference of the unlinked document
+            link_type: Type of link that was removed
+
+        Returns:
+            Created HistoryEntry
+        """
+        return self.log_action(
+            doc_id=doc_id,
+            action=HistoryAction.LINK_REMOVED,
+            old_value=f"{link_type}: {linked_doc_ref}",
+        )
+
     def get_document_history(
         self,
         doc_id: str,

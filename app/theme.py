@@ -91,6 +91,11 @@ class Typography:
         return self.get_font(self.SIZE_SECTION_HEADING, self.WEIGHT_SEMIBOLD)
 
     @property
+    def section_title(self) -> Tuple[str, int, str]:
+        """Alias for section_heading (for compatibility)."""
+        return self.section_heading
+
+    @property
     def body(self) -> Tuple[str, int, str]:
         """Font for body text."""
         return self.get_font(self.SIZE_BODY, self.WEIGHT_REGULAR)

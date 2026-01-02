@@ -493,21 +493,24 @@ class DocumentDialog(BaseDialog):
             Tuple of (is_valid, error_message)
         """
         # Required fields
-        if not validate_required(self.ref_var.get()):
-            return False, "Reference code is required"
+        ref_valid, ref_err = validate_required(self.ref_var.get(), "Reference code")
+        if not ref_valid:
+            return False, ref_err
 
         ref_result = validate_document_ref(self.ref_var.get())
         if not ref_result[0]:
             return False, ref_result[1]
 
-        if not validate_required(self.title_var.get()):
-            return False, "Title is required"
+        title_valid, title_err = validate_required(self.title_var.get(), "Title")
+        if not title_valid:
+            return False, title_err
 
         if len(self.title_var.get()) < 5:
             return False, "Title must be at least 5 characters"
 
-        if not validate_required(self.owner_var.get()):
-            return False, "Owner is required"
+        owner_valid, owner_err = validate_required(self.owner_var.get(), "Owner")
+        if not owner_valid:
+            return False, owner_err
 
         version_result = validate_version(self.version_var.get())
         if not version_result[0]:
