@@ -1,0 +1,24 @@
+# PolicyHub Dependencies
+# Python 3.11+ required
+
+# UI Framework
+customtkinter>=5.2.0
+tksheet>=7.0.0
+tkcalendar>=1.6.1
+
+# Security
+bcrypt>=4.0.0
+
+# Reporting
+reportlab>=4.0.0
+openpyxl>=3.1.0
+
+# File type detection (Windows)
+python-magic-bin>=0.4.14
+
+# Packaging
+pyinstaller>=6.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
