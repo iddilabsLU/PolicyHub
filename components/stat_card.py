@@ -53,14 +53,18 @@ class StatCard(ctk.CTkFrame):
             on_click: Optional callback when card is clicked
             **kwargs: Additional frame options
         """
+        # Use input border color for subtle shadow effect
+        shadow_border = COLORS.INPUT_BORDER
         super().__init__(
             parent,
             fg_color=COLORS.CARD,
             corner_radius=SPACING.CORNER_RADIUS_LARGE,
             border_width=1,
-            border_color=COLORS.BORDER,
+            border_color=shadow_border,
+            height=90,  # Ensure consistent card height
             **kwargs
         )
+        self._default_border = shadow_border
 
         self._on_click = on_click
         self._accent_color = accent_color or COLORS.PRIMARY
@@ -137,7 +141,7 @@ class StatCard(ctk.CTkFrame):
 
     def _on_leave(self, event) -> None:
         """Handle mouse leave."""
-        self.configure(border_color=COLORS.BORDER)
+        self.configure(border_color=self._default_border)
 
     def set_value(self, value: str) -> None:
         """

@@ -34,8 +34,8 @@ class MainView(BaseView):
     - Dashboard
     - Register
     - Document Detail
-    - Reports (placeholder)
-    - Settings (admin only, placeholder)
+    - Reports
+    - Settings (admin only)
     """
 
     def __init__(self, parent: ctk.CTkFrame, app: "PolicyHubApp"):
@@ -59,7 +59,8 @@ class MainView(BaseView):
 
     def _build_ui(self) -> None:
         """Build the main view UI."""
-        # Configure grid
+        # Configure grid with proper column weights
+        self.grid_columnconfigure(0, weight=0, minsize=SPACING.SIDEBAR_WIDTH)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -113,26 +114,26 @@ class MainView(BaseView):
         self.dashboard_btn = self._create_nav_button(
             nav_frame, "  Dashboard", "dashboard"
         )
-        self.dashboard_btn.pack(fill="x", pady=2)
+        self.dashboard_btn.pack(fill="x", pady=4)
 
         # Register button
         self.register_btn = self._create_nav_button(
             nav_frame, "  Register", "register"
         )
-        self.register_btn.pack(fill="x", pady=2)
+        self.register_btn.pack(fill="x", pady=4)
 
         # Reports button (placeholder)
         self.reports_btn = self._create_nav_button(
             nav_frame, "  Reports", "reports"
         )
-        self.reports_btn.pack(fill="x", pady=2)
+        self.reports_btn.pack(fill="x", pady=4)
 
         # Settings button (admin only)
         if self.session.is_admin():
             self.settings_btn = self._create_nav_button(
                 nav_frame, "  Settings", "settings"
             )
-            self.settings_btn.pack(fill="x", pady=2)
+            self.settings_btn.pack(fill="x", pady=4)
 
         # User info and logout at bottom
         user_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -164,6 +165,21 @@ class MainView(BaseView):
                 text_color=COLORS.SECONDARY,
             )
             role_label.pack(anchor="w", pady=(2, 10))
+
+        # Change Password button
+        self.change_password_btn = ctk.CTkButton(
+            user_frame,
+            text="Change Password",
+            command=self._on_change_password,
+            fg_color="transparent",
+            hover_color=COLORS.PRIMARY_HOVER,
+            text_color=COLORS.PRIMARY_FOREGROUND,
+            height=32,
+            font=TYPOGRAPHY.small,
+            border_width=1,
+            border_color=COLORS.PRIMARY_FOREGROUND,
+        )
+        self.change_password_btn.pack(fill="x", pady=(0, 8))
 
         # Logout button
         self.logout_btn = ctk.CTkButton(
@@ -268,18 +284,16 @@ class MainView(BaseView):
                 logger.info("RegisterView created successfully")
 
             elif view_name == "reports":
-                # Placeholder
-                self.content_views[view_name] = self._create_placeholder_view(
-                    "Reports",
-                    "Report generation will be available in a future update."
-                )
+                from views.reports_view import ReportsView
+                logger.info("Creating ReportsView...")
+                self.content_views[view_name] = ReportsView(self.content, self.app)
+                logger.info("ReportsView created successfully")
 
             elif view_name == "settings":
-                # Placeholder
-                self.content_views[view_name] = self._create_placeholder_view(
-                    "Settings",
-                    "Settings management will be available in a future update."
-                )
+                from views.settings_view import SettingsView
+                logger.info("Creating SettingsView...")
+                self.content_views[view_name] = SettingsView(self.content, self.app)
+                logger.info("SettingsView created successfully")
 
             elif view_name == "document_detail":
                 # Document detail view is created dynamically with a document
@@ -426,6 +440,13 @@ class MainView(BaseView):
         )
 
         self._switch_content_view("document_detail")
+
+    def _on_change_password(self) -> None:
+        """Handle change password button click."""
+        from dialogs.change_password_dialog import ChangePasswordDialog
+
+        dialog = ChangePasswordDialog(self.winfo_toplevel(), self.app.db)
+        dialog.show()
 
     def _on_logout(self) -> None:
         """Handle logout button click."""

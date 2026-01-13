@@ -108,13 +108,14 @@ class PolicyHubApp(ctk.CTk):
 
         self.db = DatabaseManager(db_path)
 
-        # Check if database exists and has users
-        if not self.db.database_exists():
-            logger.info("Database does not exist, initializing schema")
-            self.db.initialize_schema()
-            self._show_admin_creation_view()
-        elif not self.db.has_any_users():
-            logger.info("Database exists but has no users")
+        # Always initialize schema - this is safe for existing databases
+        # and will run any pending migrations
+        is_new_db = not self.db.database_exists()
+        self.db.initialize_schema()
+
+        # Check if we need to create admin user
+        if is_new_db or not self.db.has_any_users():
+            logger.info("No users found, showing admin creation")
             self._show_admin_creation_view()
         else:
             logger.info("Database ready, showing login")
@@ -169,6 +170,22 @@ class PolicyHubApp(ctk.CTk):
         self.current_view = view
         view.on_show()
 
+    def _show_force_password_view(self) -> None:
+        """Show the force password change view."""
+        from views.force_password_view import ForcePasswordChangeView
+
+        self._clear_container()
+
+        view = ForcePasswordChangeView(
+            parent=self.container,
+            app=self,
+            db=self.db,
+            on_password_changed=self._on_password_changed,
+        )
+        view.pack(fill="both", expand=True)
+        self.current_view = view
+        view.on_show()
+
     def _show_main_view(self) -> None:
         """Show the main application view."""
         from views.main_view import MainView
@@ -207,7 +224,18 @@ class PolicyHubApp(ctk.CTk):
 
     def _on_login_success(self) -> None:
         """Called when login succeeds."""
-        logger.info("Login successful, showing main view")
+        # Check if user needs to change password
+        user = self.session_manager.current_user
+        if user and user.force_password_change:
+            logger.info("User must change password, showing force password view")
+            self._show_force_password_view()
+        else:
+            logger.info("Login successful, showing main view")
+            self._show_main_view()
+
+    def _on_password_changed(self) -> None:
+        """Called when user successfully changes their password (force change)."""
+        logger.info("Password changed, showing main view")
         self._show_main_view()
 
     def _on_change_folder(self) -> None:

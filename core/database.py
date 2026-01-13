@@ -29,9 +29,10 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
-    email TEXT,
+    email TEXT UNIQUE,
     role TEXT NOT NULL CHECK (role IN ('ADMIN', 'EDITOR', 'VIEWER')),
     is_active INTEGER NOT NULL DEFAULT 1,
+    force_password_change INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     created_by TEXT,
     last_login TEXT,
@@ -39,11 +40,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Documents table
 CREATE TABLE IF NOT EXISTS documents (
     doc_id TEXT PRIMARY KEY,
-    doc_type TEXT NOT NULL CHECK (doc_type IN ('POLICY', 'PROCEDURE', 'MANUAL', 'REGISTER')),
+    doc_type TEXT NOT NULL CHECK (doc_type IN ('POLICY', 'PROCEDURE', 'MANUAL', 'HR_OTHERS')),
     doc_ref TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
@@ -57,6 +59,8 @@ CREATE TABLE IF NOT EXISTS documents (
     next_review_date TEXT NOT NULL,
     review_frequency TEXT NOT NULL CHECK (review_frequency IN ('ANNUAL', 'SEMI_ANNUAL', 'QUARTERLY', 'AD_HOC')),
     notes TEXT,
+    mandatory_read_all INTEGER NOT NULL DEFAULT 0,
+    applicable_entity TEXT,
     created_at TEXT NOT NULL,
     created_by TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -70,6 +74,8 @@ CREATE INDEX IF NOT EXISTS idx_documents_doc_ref ON documents(doc_ref);
 CREATE INDEX IF NOT EXISTS idx_documents_category ON documents(category);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_next_review ON documents(next_review_date);
+CREATE INDEX IF NOT EXISTS idx_documents_mandatory ON documents(mandatory_read_all);
+CREATE INDEX IF NOT EXISTS idx_documents_entity ON documents(applicable_entity);
 
 -- Attachments table
 CREATE TABLE IF NOT EXISTS attachments (
@@ -136,6 +142,15 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_by TEXT,
     FOREIGN KEY (updated_by) REFERENCES users(user_id)
 );
+
+-- Entities table (for applicable entity dropdown)
+CREATE TABLE IF NOT EXISTS entities (
+    entity_id TEXT PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
 """
 
 
@@ -230,6 +245,7 @@ class DatabaseManager:
         Create the database schema if it doesn't exist.
 
         Creates all tables, indexes, and seeds default data.
+        Also runs migrations to update existing databases.
         """
         logger.info(f"Initializing database schema at: {self.db_path}")
 
@@ -240,6 +256,9 @@ class DatabaseManager:
             # Create tables
             conn.executescript(SCHEMA_SQL)
 
+            # Run migrations for existing databases
+            self._run_migrations(conn)
+
             # Seed default categories
             self._seed_categories(conn)
 
@@ -247,6 +266,69 @@ class DatabaseManager:
             self._seed_settings(conn)
 
         logger.info("Database schema initialized successfully")
+
+    def _run_migrations(self, conn: sqlite3.Connection) -> None:
+        """
+        Run database migrations to update existing databases.
+
+        Adds new columns and tables that may be missing from older databases.
+
+        Args:
+            conn: Database connection
+        """
+        # Check documents table columns
+        cursor = conn.execute("PRAGMA table_info(documents)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        # Migration: Add mandatory_read_all column if missing
+        if "mandatory_read_all" not in columns:
+            logger.info("Migration: Adding mandatory_read_all column to documents")
+            conn.execute(
+                "ALTER TABLE documents ADD COLUMN mandatory_read_all INTEGER NOT NULL DEFAULT 0"
+            )
+
+        # Migration: Add applicable_entity column if missing
+        if "applicable_entity" not in columns:
+            logger.info("Migration: Adding applicable_entity column to documents")
+            conn.execute(
+                "ALTER TABLE documents ADD COLUMN applicable_entity TEXT"
+            )
+
+        # Migration: Create entities table if missing
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='entities'"
+        )
+        if cursor.fetchone() is None:
+            logger.info("Migration: Creating entities table")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS entities (
+                    entity_id TEXT PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)")
+
+        # Migration: Create new indexes if missing
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_mandatory ON documents(mandatory_read_all)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_entity ON documents(applicable_entity)")
+
+        # Migration: Update REGISTER to HR_OTHERS for existing documents
+        conn.execute("UPDATE documents SET doc_type = 'HR_OTHERS' WHERE doc_type = 'REGISTER'")
+
+        # Check users table columns for user management migrations
+        cursor = conn.execute("PRAGMA table_info(users)")
+        user_columns = {row[1] for row in cursor.fetchall()}
+
+        # Migration: Add force_password_change column if missing
+        if "force_password_change" not in user_columns:
+            logger.info("Migration: Adding force_password_change column to users")
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN force_password_change INTEGER NOT NULL DEFAULT 0"
+            )
+
+        # Migration: Create email index if missing
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
     def _seed_categories(self, conn: sqlite3.Connection) -> None:
         """

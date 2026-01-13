@@ -39,6 +39,7 @@ class User:
     email: Optional[str] = None
     created_by: Optional[str] = None
     last_login: Optional[str] = None
+    force_password_change: bool = False
 
     def can_edit(self) -> bool:
         """Check if user can edit documents (Admin or Editor)."""
@@ -86,6 +87,7 @@ class User:
             created_at=row["created_at"],
             created_by=row["created_by"],
             last_login=row["last_login"],
+            force_password_change=bool(row["force_password_change"]) if "force_password_change" in row.keys() else False,
         )
 
     def to_dict(self) -> dict:
@@ -105,6 +107,7 @@ class User:
             "created_at": self.created_at,
             "created_by": self.created_by,
             "last_login": self.last_login,
+            "force_password_change": self.force_password_change,
         }
 
 

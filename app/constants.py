@@ -15,12 +15,18 @@ class DocumentType(str, Enum):
     POLICY = "POLICY"
     PROCEDURE = "PROCEDURE"
     MANUAL = "MANUAL"
-    REGISTER = "REGISTER"
+    HR_OTHERS = "HR_OTHERS"
 
     @property
     def display_name(self) -> str:
         """Human-readable name."""
-        return self.value.title()
+        names = {
+            "POLICY": "Policy",
+            "PROCEDURE": "Procedure",
+            "MANUAL": "Manual",
+            "HR_OTHERS": "HR Others",
+        }
+        return names[self.value]
 
     @property
     def code_prefix(self) -> str:
@@ -29,7 +35,7 @@ class DocumentType(str, Enum):
             "POLICY": "POL",
             "PROCEDURE": "PROC",
             "MANUAL": "MAN",
-            "REGISTER": "REG",
+            "HR_OTHERS": "HR",
         }
         return prefixes[self.value]
 

@@ -53,9 +53,14 @@ A native Windows desktop application for managing policies and procedures in reg
    pip install -r requirements.txt
    ```
 
-2. **Build the executable:**
+2. **Build the executable using the build script:**
    ```bash
-   pyinstaller --name PolicyHub --onefile --windowed --icon=assets/icons/app_icon.ico main.py
+   build.bat
+   ```
+
+   Or manually with PyInstaller:
+   ```bash
+   pyinstaller PolicyHub.spec
    ```
 
 3. **Find the executable in `dist/PolicyHub.exe`**
@@ -112,6 +117,8 @@ pytest tests/test_auth.py
 policyhub/
 ├── main.py                 # Application entry point
 ├── requirements.txt        # Python dependencies
+├── build.bat               # Windows build script
+├── PolicyHub.spec          # PyInstaller configuration
 ├── app/
 │   ├── application.py      # Main application class
 │   ├── constants.py        # Enums and constants
@@ -122,8 +129,24 @@ policyhub/
 │   ├── session.py          # User session management
 │   └── permissions.py      # Role-based access control
 ├── models/                 # Data classes
-├── services/               # Business logic
+├── services/               # Business logic layer
+│   ├── auth_service.py     # Authentication
+│   ├── user_service.py     # User management
+│   ├── document_service.py # Document CRUD
+│   ├── category_service.py # Category management
+│   ├── settings_service.py # Application settings
+│   ├── report_service.py   # Report generation
+│   └── ...                 # Other services
 ├── views/                  # UI screens
+│   ├── main_view.py        # Main application view
+│   ├── dashboard_view.py   # Dashboard with statistics
+│   ├── register_view.py    # Document register
+│   ├── reports_view.py     # Report generation
+│   ├── settings_view.py    # Settings container
+│   └── settings/           # Settings sub-views
+├── dialogs/                # Modal dialogs
+├── components/             # Reusable UI components
+├── reports/                # PDF/Excel generators
 ├── utils/                  # Helper functions
 └── tests/                  # Pytest tests
 ```
@@ -161,8 +184,15 @@ Open Source
 
 ## Version
 
-1.0.0 - Phase 1 & 2 (Foundation + Authentication)
+2.0.0 - Complete Implementation
+
+**Completed Phases:**
+- Phase 1-2: Foundation & Authentication
+- Phase 3-4: Document Management & UI Components
+- Phase 5: Attachments & Document Linking
+- Phase 6: Reports & Settings
+- Phase 7: UI Modernization & Build System
 
 ---
 
-For more details, see `PolicyHub_PRD.md`.
+For more details, see `PolicyHub_PRD.md` and `CLAUDE.md`.

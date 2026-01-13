@@ -120,8 +120,8 @@ class AdminCreationView(CenteredView):
         configure_input_style(self.fullname_entry)
         self.fullname_entry.grid(row=3, column=0, sticky="ew", pady=(0, 15))
 
-        # Email (optional)
-        self._create_field(form_frame, "Email (optional):", 4)
+        # Email (required)
+        self._create_field(form_frame, "Email *", 4)
         self.email_entry = ctk.CTkEntry(form_frame, placeholder_text="j.smith@company.lu")
         configure_input_style(self.email_entry)
         self.email_entry.grid(row=5, column=0, sticky="ew", pady=(0, 15))
@@ -190,7 +190,7 @@ class AdminCreationView(CenteredView):
         """Handle the Create button click."""
         username = self.username_entry.get().strip()
         full_name = self.fullname_entry.get().strip()
-        email = self.email_entry.get().strip() or None
+        email = self.email_entry.get().strip()
         password = self.password_entry.get()
         confirm = self.confirm_entry.get()
 
@@ -206,12 +206,15 @@ class AdminCreationView(CenteredView):
             self.status_label.configure(text=error, text_color=COLORS.DANGER)
             return
 
-        # Validate email (if provided)
-        if email:
-            valid, error = validate_email(email)
-            if not valid:
-                self.status_label.configure(text=error, text_color=COLORS.DANGER)
-                return
+        # Validate email (required)
+        if not email:
+            self.status_label.configure(text="Email is required.", text_color=COLORS.DANGER)
+            return
+
+        valid, error = validate_email(email)
+        if not valid:
+            self.status_label.configure(text=error, text_color=COLORS.DANGER)
+            return
 
         # Validate password
         valid, error = validate_password(password)

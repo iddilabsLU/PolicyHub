@@ -16,6 +16,7 @@ from dialogs.confirm_dialog import InfoDialog
 from models.category import Category
 from models.document import Document, DocumentCreate, DocumentUpdate
 from services.document_service import DocumentService
+from services.entity_service import EntityService
 from utils.dates import calculate_next_review, get_today, parse_display_date, format_date
 from utils.validators import (
     validate_document_ref,
@@ -60,9 +61,10 @@ class DocumentDialog(BaseDialog):
         self.is_edit = document is not None
 
         title = "Edit Document" if self.is_edit else "Add New Document"
-        super().__init__(parent, title, width=700, height=700, resizable=True)
+        super().__init__(parent, title, width=700, height=750, resizable=True)
 
         self.doc_service = DocumentService(db)
+        self.entity_service = EntityService(db)
         self._build_ui()
 
         if self.is_edit:
@@ -384,6 +386,76 @@ class DocumentDialog(BaseDialog):
         )
         self.notes_text.pack(fill="x", padx=padx, pady=(0, pady))
 
+        # --- Additional Settings ---
+        self._create_label(form, "Additional Settings")
+
+        row_additional = ctk.CTkFrame(form, fg_color="transparent")
+        row_additional.pack(fill="x", padx=padx, pady=pady)
+        row_additional.columnconfigure(0, weight=1)
+        row_additional.columnconfigure(1, weight=1)
+
+        # Applicable Entity (combobox that allows new entries)
+        entity_frame = ctk.CTkFrame(row_additional, fg_color="transparent")
+        entity_frame.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        ctk.CTkLabel(
+            entity_frame,
+            text="Applicable Entity",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_SECONDARY
+        ).pack(anchor="w")
+
+        # Get existing entities for dropdown
+        entity_names = self.entity_service.get_entity_names()
+        self.entity_var = ctk.StringVar()
+        self.entity_combobox = ctk.CTkComboBox(
+            entity_frame,
+            values=entity_names,
+            variable=self.entity_var,
+            width=250,
+            height=36,
+            font=TYPOGRAPHY.body,
+            dropdown_font=TYPOGRAPHY.body,
+        )
+        self.entity_combobox.pack(fill="x")
+        self.entity_combobox.set("")  # Start empty
+
+        # Helper text for entity field
+        ctk.CTkLabel(
+            entity_frame,
+            text="Select or type a new entity",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_MUTED,
+        ).pack(anchor="w", pady=(2, 0))
+
+        # Mandatory Read All checkbox
+        mandatory_frame = ctk.CTkFrame(row_additional, fg_color="transparent")
+        mandatory_frame.grid(row=0, column=1, sticky="ew")
+        ctk.CTkLabel(
+            mandatory_frame,
+            text="Policy Settings",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_SECONDARY
+        ).pack(anchor="w")
+
+        self.mandatory_var = ctk.BooleanVar(value=False)
+        self.mandatory_checkbox = ctk.CTkCheckBox(
+            mandatory_frame,
+            text="Mandatory Read for All",
+            variable=self.mandatory_var,
+            font=TYPOGRAPHY.body,
+            checkbox_height=20,
+            checkbox_width=20,
+        )
+        self.mandatory_checkbox.pack(anchor="w", pady=(8, 0))
+
+        # Helper text for mandatory
+        ctk.CTkLabel(
+            mandatory_frame,
+            text="Employees must read this document",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_MUTED,
+        ).pack(anchor="w", pady=(2, 0))
+
     def _create_label(self, parent, text: str, pack: bool = False) -> ctk.CTkLabel:
         """Create a form field label."""
         label = ctk.CTkLabel(
@@ -485,6 +557,11 @@ class DocumentDialog(BaseDialog):
             self.notes_text.delete("1.0", "end")
             self.notes_text.insert("1.0", doc.notes)
 
+        # Set mandatory read and applicable entity
+        self.mandatory_var.set(doc.mandatory_read_all)
+        if doc.applicable_entity:
+            self.entity_var.set(doc.applicable_entity)
+
     def _validate_form(self) -> Tuple[bool, str]:
         """
         Validate all form fields.
@@ -561,6 +638,9 @@ class DocumentDialog(BaseDialog):
                 frequency = f.value
                 break
 
+        # Get applicable entity (may be new or existing)
+        entity_value = self.entity_var.get().strip() if self.entity_var.get() else None
+
         return {
             "doc_type": self.type_var.get(),
             "doc_ref": self.ref_var.get().upper(),
@@ -576,6 +656,8 @@ class DocumentDialog(BaseDialog):
             "last_review_date": parse_display_date(self.last_review_var.get()),
             "next_review_date": parse_display_date(self.next_review_var.get()),
             "notes": self.notes_text.get("1.0", "end-1c").strip() or None,
+            "mandatory_read_all": self.mandatory_var.get(),
+            "applicable_entity": entity_value,
         }
 
     def _on_save(self) -> None:
@@ -587,6 +669,10 @@ class DocumentDialog(BaseDialog):
 
         try:
             data = self._get_form_data()
+
+            # If an entity was entered, ensure it exists (create if new)
+            if data.get("applicable_entity"):
+                self.entity_service.get_or_create_entity(data["applicable_entity"])
 
             if self.is_edit:
                 update_data = DocumentUpdate(**{k: v for k, v in data.items() if k != "doc_type" and k != "doc_ref"})

@@ -132,6 +132,7 @@ class AuthService:
             username=user.username,
             full_name=user.full_name,
             role=user.role,
+            force_password_change=user.force_password_change,
         )
 
         return session
@@ -176,8 +177,8 @@ class AuthService:
                 """
                 INSERT INTO users (
                     user_id, username, password_hash, full_name, email,
-                    role, is_active, created_at, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, NULL)
+                    role, is_active, force_password_change, created_at, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, NULL)
                 """,
                 (
                     user_id,
@@ -245,24 +246,34 @@ class AuthService:
         if not self.verify_password(current_password, user.password_hash):
             return False, "Current password is incorrect"
 
-        # Update password
+        # Update password and clear force_password_change flag
         new_hash = self.hash_password(new_password)
         with self.db.get_connection() as conn:
             conn.execute(
-                "UPDATE users SET password_hash = ? WHERE user_id = ?",
+                "UPDATE users SET password_hash = ?, force_password_change = 0 WHERE user_id = ?",
                 (new_hash, user_id),
             )
+
+        # Update session to reflect the change
+        if self.session_manager.current_user and self.session_manager.current_user.user_id == user_id:
+            self.session_manager.current_user.force_password_change = False
 
         logger.info(f"Password changed for user: {user.username}")
         return True, ""
 
-    def reset_password(self, user_id: str, new_password: str) -> bool:
+    def reset_password(
+        self,
+        user_id: str,
+        new_password: str,
+        force_change: bool = True,
+    ) -> bool:
         """
         Reset a user's password (admin function).
 
         Args:
             user_id: User's ID
             new_password: New password to set
+            force_change: Whether to require password change on next login
 
         Returns:
             True if successful
@@ -270,13 +281,66 @@ class AuthService:
         new_hash = self.hash_password(new_password)
         with self.db.get_connection() as conn:
             cursor = conn.execute(
-                "UPDATE users SET password_hash = ? WHERE user_id = ?",
+                "UPDATE users SET password_hash = ?, force_password_change = ? WHERE user_id = ?",
+                (new_hash, 1 if force_change else 0, user_id),
+            )
+            if cursor.rowcount > 0:
+                logger.info(f"Password reset for user_id: {user_id} (force_change={force_change})")
+                return True
+        return False
+
+    def clear_force_password_change(self, user_id: str) -> bool:
+        """
+        Clear the force_password_change flag for a user.
+
+        Used after user successfully changes their password via the force change screen.
+
+        Args:
+            user_id: User's ID
+
+        Returns:
+            True if successful
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET force_password_change = 0 WHERE user_id = ?",
+                (user_id,),
+            )
+            if cursor.rowcount > 0:
+                # Update session if this is the current user
+                if self.session_manager.current_user and self.session_manager.current_user.user_id == user_id:
+                    self.session_manager.current_user.force_password_change = False
+                logger.info(f"Force password change cleared for user_id: {user_id}")
+                return True
+        return False
+
+    def set_new_password(self, user_id: str, new_password: str) -> tuple[bool, str]:
+        """
+        Set a new password for a user (used during forced password change).
+
+        Unlike change_password, this does not require the current password.
+        Clears the force_password_change flag.
+
+        Args:
+            user_id: User's ID
+            new_password: New password to set
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        new_hash = self.hash_password(new_password)
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET password_hash = ?, force_password_change = 0 WHERE user_id = ?",
                 (new_hash, user_id),
             )
             if cursor.rowcount > 0:
-                logger.info(f"Password reset for user_id: {user_id}")
-                return True
-        return False
+                # Update session to reflect the change
+                if self.session_manager.current_user and self.session_manager.current_user.user_id == user_id:
+                    self.session_manager.current_user.force_password_change = False
+                logger.info(f"New password set for user_id: {user_id}")
+                return True, ""
+        return False, "Failed to update password"
 
     @property
     def current_user(self) -> Optional[UserSession]:

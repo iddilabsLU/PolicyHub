@@ -49,10 +49,12 @@ htmlcov/
 
 # Local config (user-specific)
 config.json
+.env
 
 # Logs
 logs/
 *.log
+error logs.txt
 
 # Database (local development only)
 *.db
@@ -70,3 +72,8 @@ desktop.ini
 # Temporary files
 *.tmp
 *.temp
+
+# Generated Reports and Data
+*.pdf
+*.xlsx
+*.csv

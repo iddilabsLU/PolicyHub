@@ -19,7 +19,7 @@ class Document:
 
     Attributes:
         doc_id: Unique identifier (UUID)
-        doc_type: Type of document (POLICY, PROCEDURE, MANUAL, REGISTER)
+        doc_type: Type of document (POLICY, PROCEDURE, MANUAL, HR_OTHERS)
         doc_ref: Unique reference code (e.g., POL-AML-001)
         title: Document title
         category: Category code (e.g., AML, GOV, OPS)
@@ -37,6 +37,8 @@ class Document:
         description: Brief description (optional)
         approver: Final approver (optional)
         notes: Free text notes (optional)
+        mandatory_read_all: Whether this document is mandatory for all employees
+        applicable_entity: The entity this document applies to (optional)
     """
 
     doc_id: str
@@ -58,6 +60,8 @@ class Document:
     description: Optional[str] = None
     approver: Optional[str] = None
     notes: Optional[str] = None
+    mandatory_read_all: bool = False
+    applicable_entity: Optional[str] = None
 
     @property
     def type_display(self) -> str:
@@ -128,6 +132,8 @@ class Document:
             next_review_date=row["next_review_date"],
             review_frequency=row["review_frequency"],
             notes=row["notes"],
+            mandatory_read_all=bool(row["mandatory_read_all"]),
+            applicable_entity=row["applicable_entity"],
             created_at=row["created_at"],
             created_by=row["created_by"],
             updated_at=row["updated_at"],
@@ -157,6 +163,8 @@ class Document:
             "next_review_date": self.next_review_date,
             "review_frequency": self.review_frequency,
             "notes": self.notes,
+            "mandatory_read_all": self.mandatory_read_all,
+            "applicable_entity": self.applicable_entity,
             "created_at": self.created_at,
             "created_by": self.created_by,
             "updated_at": self.updated_at,
@@ -182,6 +190,8 @@ class DocumentCreate:
     description: Optional[str] = None
     approver: Optional[str] = None
     notes: Optional[str] = None
+    mandatory_read_all: bool = False
+    applicable_entity: Optional[str] = None
 
 
 @dataclass
@@ -200,3 +210,5 @@ class DocumentUpdate:
     next_review_date: Optional[str] = None
     review_frequency: Optional[str] = None
     notes: Optional[str] = None
+    mandatory_read_all: Optional[bool] = None
+    applicable_entity: Optional[str] = None

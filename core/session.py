@@ -25,6 +25,7 @@ class UserSession:
     username: str
     full_name: str
     role: str
+    force_password_change: bool = False
 
     def can_edit(self) -> bool:
         """
@@ -106,7 +107,14 @@ class SessionManager:
         cls._instance = None
         cls._session = None
 
-    def login(self, user_id: str, username: str, full_name: str, role: str) -> UserSession:
+    def login(
+        self,
+        user_id: str,
+        username: str,
+        full_name: str,
+        role: str,
+        force_password_change: bool = False,
+    ) -> UserSession:
         """
         Create a new session for a user.
 
@@ -115,6 +123,7 @@ class SessionManager:
             username: User's username
             full_name: User's display name
             role: User's role (ADMIN, EDITOR, VIEWER)
+            force_password_change: Whether user must change password
 
         Returns:
             The created UserSession
@@ -124,6 +133,7 @@ class SessionManager:
             username=username,
             full_name=full_name,
             role=role,
+            force_password_change=force_password_change,
         )
         return self._session
 

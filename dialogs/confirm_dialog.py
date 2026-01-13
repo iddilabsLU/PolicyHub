@@ -261,3 +261,16 @@ class InfoDialog(BaseDialog):
         """
         dialog = cls(parent, f"Error: {title}", message)
         dialog.show()
+
+    @classmethod
+    def show_success(cls, parent, title: str, message: str) -> None:
+        """
+        Show a success dialog.
+
+        Args:
+            parent: Parent window
+            title: Dialog title
+            message: Success message to display
+        """
+        dialog = cls(parent, title, message)
+        dialog.show()

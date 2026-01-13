@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import customtkinter as ctk
 
 from app.constants import DocumentStatus, DocumentType, ReviewStatus
-from app.theme import COLORS, SPACING, TYPOGRAPHY, configure_button_style
+from app.theme import COLORS, SPACING, TYPOGRAPHY, configure_button_style, configure_card_style
 from components.stat_card import StatCard
 from components.status_badge import StatusBadge
 from core.database import DatabaseManager
@@ -51,6 +51,7 @@ class DashboardView(BaseView):
         header = ctk.CTkFrame(self, fg_color=COLORS.CARD, height=60)
         header.pack(fill="x", padx=SPACING.WINDOW_PADDING, pady=SPACING.WINDOW_PADDING)
         header.pack_propagate(False)
+        configure_card_style(header, with_shadow=True)
 
         title = ctk.CTkLabel(
             header,
@@ -138,7 +139,7 @@ class DashboardView(BaseView):
             row2,
             value="0",
             label="Policies",
-            accent_color="#6366F1",  # Indigo
+            accent_color=COLORS.ACCENT_POLICY,
             on_click=lambda: self._on_stat_click("policy"),
         )
         self.policies_card.pack(side="left", fill="x", expand=True, padx=(0, 10))
@@ -147,7 +148,7 @@ class DashboardView(BaseView):
             row2,
             value="0",
             label="Procedures",
-            accent_color="#8B5CF6",  # Purple
+            accent_color=COLORS.ACCENT_PROCEDURE,
             on_click=lambda: self._on_stat_click("procedure"),
         )
         self.procedures_card.pack(side="left", fill="x", expand=True, padx=(0, 10))
@@ -156,19 +157,19 @@ class DashboardView(BaseView):
             row2,
             value="0",
             label="Manuals",
-            accent_color="#EC4899",  # Pink
+            accent_color=COLORS.ACCENT_MANUAL,
             on_click=lambda: self._on_stat_click("manual"),
         )
         self.manuals_card.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-        self.registers_card = StatCard(
+        self.hr_others_card = StatCard(
             row2,
             value="0",
-            label="Registers",
-            accent_color="#14B8A6",  # Teal
-            on_click=lambda: self._on_stat_click("register"),
+            label="HR Others",
+            accent_color=COLORS.ACCENT_HR_OTHERS,
+            on_click=lambda: self._on_stat_click("hr_others"),
         )
-        self.registers_card.pack(side="left", fill="x", expand=True)
+        self.hr_others_card.pack(side="left", fill="x", expand=True)
 
     def _build_review_status_section(self) -> None:
         """Build the review status summary section."""
@@ -179,58 +180,52 @@ class DashboardView(BaseView):
             font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_PRIMARY,
         )
-        section_title.pack(anchor="w", pady=(10, 10))
+        section_title.pack(anchor="w", pady=(10, 12))
 
-        # Status cards row
+        # Status cards row - using grid for equal distribution
         self.review_status_frame = ctk.CTkFrame(
             self.content,
             fg_color=COLORS.CARD,
             corner_radius=SPACING.CORNER_RADIUS_LARGE,
         )
         self.review_status_frame.pack(fill="x", pady=(0, 20))
+        configure_card_style(self.review_status_frame, with_shadow=True)
 
+        # Inner container with grid layout
         inner = ctk.CTkFrame(self.review_status_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=15)
+        inner.pack(fill="x", padx=24, pady=20)
+
+        # Configure equal columns
+        for i in range(4):
+            inner.grid_columnconfigure(i, weight=1)
 
         # Overdue
         self.overdue_frame = self._create_review_status_item(
             inner, "Overdue", "0", "danger",
             lambda: self._on_review_status_click("OVERDUE")
         )
-        self.overdue_frame.pack(side="left", fill="x", expand=True)
-
-        # Separator
-        sep1 = ctk.CTkFrame(inner, fg_color=COLORS.BORDER, width=1)
-        sep1.pack(side="left", fill="y", padx=15)
+        self.overdue_frame.grid(row=0, column=0, sticky="nsew", padx=8)
 
         # Due Soon
         self.due_soon_frame = self._create_review_status_item(
             inner, "Due Soon", "0", "warning",
             lambda: self._on_review_status_click("DUE_SOON")
         )
-        self.due_soon_frame.pack(side="left", fill="x", expand=True)
-
-        # Separator
-        sep2 = ctk.CTkFrame(inner, fg_color=COLORS.BORDER, width=1)
-        sep2.pack(side="left", fill="y", padx=15)
+        self.due_soon_frame.grid(row=0, column=1, sticky="nsew", padx=8)
 
         # Upcoming
         self.upcoming_frame = self._create_review_status_item(
             inner, "Upcoming", "0", "caution",
             lambda: self._on_review_status_click("UPCOMING")
         )
-        self.upcoming_frame.pack(side="left", fill="x", expand=True)
-
-        # Separator
-        sep3 = ctk.CTkFrame(inner, fg_color=COLORS.BORDER, width=1)
-        sep3.pack(side="left", fill="y", padx=15)
+        self.upcoming_frame.grid(row=0, column=2, sticky="nsew", padx=8)
 
         # On Track
         self.on_track_frame = self._create_review_status_item(
             inner, "On Track", "0", "success",
             lambda: self._on_review_status_click("ON_TRACK")
         )
-        self.on_track_frame.pack(side="left", fill="x", expand=True)
+        self.on_track_frame.grid(row=0, column=3, sticky="nsew", padx=8)
 
     def _create_review_status_item(
         self,
@@ -266,9 +261,18 @@ class DashboardView(BaseView):
 
     def _build_attention_section(self) -> None:
         """Build the requires attention section."""
-        # Section header
+        # Section header with icon
         header_frame = ctk.CTkFrame(self.content, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(10, 10))
+        header_frame.pack(fill="x", pady=(10, 12))
+
+        # Alert icon (using unicode warning symbol)
+        icon_label = ctk.CTkLabel(
+            header_frame,
+            text="⚠",
+            font=TYPOGRAPHY.get_font(16, "bold"),
+            text_color=COLORS.WARNING,
+        )
+        icon_label.pack(side="left", padx=(0, 8))
 
         section_title = ctk.CTkLabel(
             header_frame,
@@ -278,17 +282,27 @@ class DashboardView(BaseView):
         )
         section_title.pack(side="left")
 
-        # Attention list container
+        # Item count badge
+        self.attention_count_label = ctk.CTkLabel(
+            header_frame,
+            text="",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_SECONDARY,
+        )
+        self.attention_count_label.pack(side="left", padx=(10, 0))
+
+        # Attention list container with enhanced styling
         self.attention_frame = ctk.CTkFrame(
             self.content,
             fg_color=COLORS.CARD,
             corner_radius=SPACING.CORNER_RADIUS_LARGE,
         )
-        self.attention_frame.pack(fill="x", pady=(0, 20))
+        self.attention_frame.pack(fill="both", expand=True, pady=(0, 20))
+        configure_card_style(self.attention_frame, with_shadow=True)
 
-        # Placeholder
+        # Inner container for the list
         self.attention_list = ctk.CTkFrame(self.attention_frame, fg_color="transparent")
-        self.attention_list.pack(fill="x", padx=10, pady=10)
+        self.attention_list.pack(fill="both", expand=True, padx=20, pady=16)
 
     def _update_attention_list(self, documents) -> None:
         """Update the attention required list."""
@@ -296,85 +310,140 @@ class DashboardView(BaseView):
         for widget in self.attention_list.winfo_children():
             widget.destroy()
 
+        # Update count badge
+        if hasattr(self, 'attention_count_label'):
+            if documents:
+                self.attention_count_label.configure(text=f"({len(documents)} items)")
+            else:
+                self.attention_count_label.configure(text="")
+
         if not documents:
+            # Empty state with icon
+            empty_frame = ctk.CTkFrame(self.attention_list, fg_color="transparent")
+            empty_frame.pack(expand=True, pady=40)
+
+            empty_icon = ctk.CTkLabel(
+                empty_frame,
+                text="✓",
+                font=TYPOGRAPHY.get_font(32, "bold"),
+                text_color=COLORS.SUCCESS,
+            )
+            empty_icon.pack()
+
             empty_label = ctk.CTkLabel(
-                self.attention_list,
-                text="No documents require attention at this time.",
+                empty_frame,
+                text="All documents are up to date!",
                 font=TYPOGRAPHY.body,
                 text_color=COLORS.TEXT_SECONDARY,
             )
-            empty_label.pack(pady=20)
+            empty_label.pack(pady=(8, 0))
             return
 
+        # Use grid layout for better column control
+        # Configure column weights for proportional sizing
+        self.attention_list.grid_columnconfigure(0, weight=1, minsize=120)   # Reference
+        self.attention_list.grid_columnconfigure(1, weight=3, minsize=200)   # Title (stretches most)
+        self.attention_list.grid_columnconfigure(2, weight=1, minsize=120)   # Next Review
+        self.attention_list.grid_columnconfigure(3, weight=1, minsize=100)   # Status
+
         # Create header row
-        header = ctk.CTkFrame(self.attention_list, fg_color=COLORS.MUTED)
-        header.pack(fill="x", pady=(0, 5))
+        header_frame = ctk.CTkFrame(
+            self.attention_list,
+            fg_color=COLORS.MUTED,
+            corner_radius=SPACING.CORNER_RADIUS_SMALL,
+            height=40,
+        )
+        header_frame.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, 4))
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_columnconfigure(1, weight=3)
+        header_frame.grid_columnconfigure(2, weight=1)
+        header_frame.grid_columnconfigure(3, weight=1)
 
-        headers = [("Reference", 100), ("Title", 300), ("Next Review", 120), ("Status", 100)]
-        for text, width in headers:
+        headers = ["Reference", "Title", "Next Review", "Status"]
+        for col, text in enumerate(headers):
             ctk.CTkLabel(
-                header,
+                header_frame,
                 text=text,
-                font=TYPOGRAPHY.get_font(12, "bold"),
+                font=TYPOGRAPHY.table_header,
                 text_color=COLORS.TEXT_PRIMARY,
-                width=width,
                 anchor="w",
-            ).pack(side="left", padx=10, pady=8)
+            ).grid(row=0, column=col, sticky="w", padx=16, pady=10)
 
-        # Create document rows
-        for doc in documents[:10]:  # Limit to 10 items
-            row = ctk.CTkFrame(
+        # Create document rows with hover effect
+        for i, doc in enumerate(documents[:10]):  # Limit to 10 items
+            row_num = i + 1
+
+            # Row container for hover effect
+            row_frame = ctk.CTkFrame(
                 self.attention_list,
                 fg_color="transparent",
                 cursor="hand2",
+                corner_radius=SPACING.CORNER_RADIUS_SMALL,
+                height=44,
             )
-            row.pack(fill="x")
-            row.bind("<Button-1>", lambda e, d=doc: self._on_document_click(d))
+            row_frame.grid(row=row_num, column=0, columnspan=4, sticky="ew", pady=1)
+            row_frame.grid_columnconfigure(0, weight=1)
+            row_frame.grid_columnconfigure(1, weight=3)
+            row_frame.grid_columnconfigure(2, weight=1)
+            row_frame.grid_columnconfigure(3, weight=1)
 
-            # Reference
+            # Bind hover and click to row
+            row_frame.bind("<Button-1>", lambda e, d=doc: self._on_document_click(d))
+            row_frame.bind("<Enter>", lambda e, r=row_frame: r.configure(fg_color=COLORS.MUTED))
+            row_frame.bind("<Leave>", lambda e, r=row_frame: r.configure(fg_color="transparent"))
+
+            # Reference - clickable link style
             ref_label = ctk.CTkLabel(
-                row,
+                row_frame,
                 text=doc.doc_ref,
                 font=TYPOGRAPHY.body,
                 text_color=COLORS.PRIMARY,
-                width=100,
                 anchor="w",
+                cursor="hand2",
             )
-            ref_label.pack(side="left", padx=10, pady=8)
+            ref_label.grid(row=0, column=0, sticky="w", padx=16, pady=12)
             ref_label.bind("<Button-1>", lambda e, d=doc: self._on_document_click(d))
+            ref_label.bind("<Enter>", lambda e, r=row_frame: r.configure(fg_color=COLORS.MUTED))
+            ref_label.bind("<Leave>", lambda e, r=row_frame: r.configure(fg_color="transparent"))
 
-            # Title
+            # Title - truncate with ellipsis if needed
+            title_text = doc.title if len(doc.title) <= 60 else doc.title[:57] + "..."
             title_label = ctk.CTkLabel(
-                row,
-                text=doc.title[:50] + "..." if len(doc.title) > 50 else doc.title,
+                row_frame,
+                text=title_text,
                 font=TYPOGRAPHY.body,
                 text_color=COLORS.TEXT_PRIMARY,
-                width=300,
                 anchor="w",
+                cursor="hand2",
             )
-            title_label.pack(side="left", padx=10, pady=8)
+            title_label.grid(row=0, column=1, sticky="w", padx=16, pady=12)
             title_label.bind("<Button-1>", lambda e, d=doc: self._on_document_click(d))
+            title_label.bind("<Enter>", lambda e, r=row_frame: r.configure(fg_color=COLORS.MUTED))
+            title_label.bind("<Leave>", lambda e, r=row_frame: r.configure(fg_color="transparent"))
 
-            # Next Review
+            # Next Review date
             date_label = ctk.CTkLabel(
-                row,
+                row_frame,
                 text=format_relative_date(doc.next_review_date),
                 font=TYPOGRAPHY.body,
                 text_color=COLORS.TEXT_SECONDARY,
-                width=120,
                 anchor="w",
+                cursor="hand2",
             )
-            date_label.pack(side="left", padx=10, pady=8)
+            date_label.grid(row=0, column=2, sticky="w", padx=16, pady=12)
             date_label.bind("<Button-1>", lambda e, d=doc: self._on_document_click(d))
+            date_label.bind("<Enter>", lambda e, r=row_frame: r.configure(fg_color=COLORS.MUTED))
+            date_label.bind("<Leave>", lambda e, r=row_frame: r.configure(fg_color="transparent"))
 
             # Status badge
-            badge = StatusBadge.from_review_status(row, doc.review_status)
-            badge.pack(side="left", padx=10, pady=8)
+            badge = StatusBadge.from_review_status(row_frame, doc.review_status)
+            badge.grid(row=0, column=3, sticky="w", padx=16, pady=12)
             badge.bind("<Button-1>", lambda e, d=doc: self._on_document_click(d))
 
-            # Divider
-            divider = ctk.CTkFrame(self.attention_list, fg_color=COLORS.BORDER, height=1)
-            divider.pack(fill="x")
+            # Divider (except for last item)
+            if i < min(len(documents), 10) - 1:
+                divider = ctk.CTkFrame(self.attention_list, fg_color=COLORS.BORDER, height=1)
+                divider.grid(row=row_num, column=0, columnspan=4, sticky="ew", padx=12, pady=0)
 
     def _refresh_data(self) -> None:
         """Refresh all dashboard data."""
@@ -393,7 +462,7 @@ class DashboardView(BaseView):
         self.policies_card.set_value(str(by_type.get(DocumentType.POLICY.value, 0)))
         self.procedures_card.set_value(str(by_type.get(DocumentType.PROCEDURE.value, 0)))
         self.manuals_card.set_value(str(by_type.get(DocumentType.MANUAL.value, 0)))
-        self.registers_card.set_value(str(by_type.get(DocumentType.REGISTER.value, 0)))
+        self.hr_others_card.set_value(str(by_type.get(DocumentType.HR_OTHERS.value, 0)))
 
         # Update review status counts
         self.overdue_frame.count_label.configure(

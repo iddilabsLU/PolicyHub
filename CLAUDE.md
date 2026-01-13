@@ -28,6 +28,16 @@ PolicyHub uses a layered architecture:
 └─────────────────────────────────────┘
 ```
 
+## UI/UX Guidelines
+
+See `UIUX.md` for detailed design specifications including:
+- Color palette (Primary: #2D3E50 Ink Blue, Secondary: #E6E2DA Warm Grey-Beige)
+- Background colors (Background: #F9FAFB, Card: #FFFFFF, Muted: #F3F4F6)
+- Typography (Segoe UI system font)
+- Spacing constants and component styling patterns
+
+**Always use theme constants from `app/theme.py` instead of hardcoded values.**
+
 ## Key Patterns
 
 ### Singleton Pattern
@@ -170,7 +180,9 @@ policyhub/
 │   ├── category_service.py    # Category CRUD
 │   ├── history_service.py     # Audit trail logging
 │   ├── attachment_service.py  # File attachment management
-│   └── link_service.py        # Document linking
+│   ├── link_service.py        # Document linking
+│   ├── settings_service.py    # Application settings CRUD
+│   └── report_service.py      # Report generation coordination
 ├── components/
 │   ├── status_badge.py        # Status badge component
 │   ├── stat_card.py           # Statistics card component
@@ -180,7 +192,10 @@ policyhub/
 │   ├── confirm_dialog.py      # Yes/No confirmation dialog
 │   ├── document_dialog.py     # Add/Edit document form
 │   ├── upload_dialog.py       # File upload dialog
-│   └── link_dialog.py         # Document linking dialog
+│   ├── link_dialog.py         # Document linking dialog
+│   ├── user_dialog.py         # Add/Edit user form
+│   ├── category_dialog.py     # Add/Edit category form
+│   └── password_reset_dialog.py # Password reset form
 ├── views/
 │   ├── base_view.py           # BaseView, CenteredView, ScrollableView
 │   ├── setup_view.py          # Folder selection wizard
@@ -189,7 +204,18 @@ policyhub/
 │   ├── main_view.py           # Main app with sidebar + view switching
 │   ├── dashboard_view.py      # Statistics and attention items
 │   ├── register_view.py       # Document table with filtering
-│   └── document_detail_view.py # Full document details with tabs
+│   ├── document_detail_view.py # Full document details with tabs
+│   ├── settings_view.py       # Settings container with tabs
+│   ├── reports_view.py        # Report generation UI
+│   └── settings/              # Settings sub-views
+│       ├── general_settings.py    # Company settings
+│       ├── users_settings.py      # User management
+│       └── categories_settings.py # Category management
+├── reports/
+│   ├── __init__.py            # Reports module
+│   ├── base_report.py         # Base report classes
+│   ├── pdf_generator.py       # PDF report generation
+│   └── excel_generator.py     # Excel report generation
 ├── utils/
 │   ├── dates.py               # Date formatting/calculations
 │   ├── validators.py          # Input validation
@@ -203,7 +229,9 @@ policyhub/
     ├── test_category_service.py # Category service tests
     ├── test_history_service.py  # History service tests
     ├── test_attachment_service.py # Attachment service tests
-    └── test_link_service.py   # Link service tests
+    ├── test_link_service.py   # Link service tests
+    ├── test_settings_service.py # Settings service tests
+    └── test_report_service.py # Report service tests
 ```
 
 ## Running the Application
@@ -216,8 +244,11 @@ python main.py
 pytest
 pytest --cov=. --cov-report=html
 
-# Build executable
-pyinstaller --name PolicyHub --onefile --windowed main.py
+# Build executable (Windows)
+build.bat
+
+# Or manually with PyInstaller
+pyinstaller PolicyHub.spec
 ```
 
 ## Implementation Status
@@ -262,11 +293,41 @@ pyinstaller --name PolicyHub --onefile --windowed main.py
 - [x] History logging for attachments and links
 - [x] Service tests (111 total tests)
 
-### Pending (Phase 6+)
-- [ ] Reports generation (PDF/Excel)
-- [ ] Settings views (categories, company settings)
-- [ ] Full user management UI
-- [ ] Audit log viewer
+### Completed (Phase 6 - Reports & Settings)
+- [x] SettingsService (key-value settings CRUD)
+- [x] ReportService (report generation coordination)
+- [x] PDF report generation with ReportLab
+- [x] Excel report generation with openpyxl
+- [x] SettingsView with tab navigation
+- [x] GeneralSettingsView (company name, thresholds, formats)
+- [x] UsersSettingsView (user management table)
+- [x] CategoriesSettingsView (category management table)
+- [x] UserDialog (add/edit users)
+- [x] CategoryDialog (add/edit categories)
+- [x] PasswordResetDialog (admin password reset)
+- [x] ReportsView (report type, filters, format selection)
+- [x] Service tests for settings and reports
+
+### Completed (Phase 7 - UI & Build)
+- [x] UI modernization with theme helpers
+- [x] Dropdown styling improvements
+- [x] Shadow effects on cards
+- [x] Professional table styling
+- [x] PyInstaller build configuration (PolicyHub.spec)
+- [x] Windows build script (build.bat)
+- [x] README documentation
+- [x] CLAUDE.md updates
+
+### All Features Complete
+The application is fully implemented with all core features:
+- Document lifecycle management
+- Attachment handling
+- Document linking
+- Report generation (PDF/Excel)
+- User management
+- Category management
+- Application settings
+- Audit trail
 
 ## Common Tasks
 

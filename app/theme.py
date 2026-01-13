@@ -46,12 +46,19 @@ class Colors:
     # Status Indicators (Muted Versions)
     DANGER: str = "#B91C1C"  # Overdue, error states
     DANGER_BG: str = "#FEE2E2"  # Overdue row highlight
+    DANGER_HOVER: str = "#991B1B"  # Darker red for hover states
     WARNING: str = "#B45309"  # Due soon (< 30 days)
     WARNING_BG: str = "#FEF3C7"  # Warning row highlight
     CAUTION: str = "#A16207"  # Upcoming (< 90 days)
     CAUTION_BG: str = "#FEF9C3"  # Caution row highlight
     SUCCESS: str = "#15803D"  # On track, success states
     SUCCESS_BG: str = "#DCFCE7"  # Success row highlight
+
+    # Document Type Accent Colors (for dashboard stats)
+    ACCENT_POLICY: str = "#6366F1"     # Indigo
+    ACCENT_PROCEDURE: str = "#8B5CF6"  # Purple
+    ACCENT_MANUAL: str = "#EC4899"     # Pink
+    ACCENT_HR_OTHERS: str = "#14B8A6"  # Teal
 
 
 @dataclass(frozen=True)
@@ -147,6 +154,7 @@ class Spacing:
     # Corner radius
     CORNER_RADIUS: int = 6
     CORNER_RADIUS_LARGE: int = 8
+    CORNER_RADIUS_SMALL: int = 4
 
 
 @dataclass(frozen=True)
@@ -197,7 +205,7 @@ def configure_button_style(button, style: str = "primary") -> None:
     elif style == "danger":
         button.configure(
             fg_color=COLORS.DANGER,
-            hover_color="#991B1B",  # Darker red for hover
+            hover_color=COLORS.DANGER_HOVER,
             text_color=COLORS.PRIMARY_FOREGROUND,
             corner_radius=SPACING.CORNER_RADIUS,
             height=SPACING.BUTTON_HEIGHT,
@@ -224,16 +232,137 @@ def configure_input_style(entry) -> None:
     )
 
 
-def configure_card_style(frame) -> None:
+def configure_card_style(frame, with_shadow: bool = False) -> None:
     """
     Apply card styling to a CustomTkinter frame.
 
     Args:
         frame: The CTkFrame instance to style
+        with_shadow: If True, use a slightly darker border for shadow effect
     """
+    border_color = "#D1D5DB" if with_shadow else COLORS.BORDER
     frame.configure(
         fg_color=COLORS.CARD,
         corner_radius=SPACING.CORNER_RADIUS_LARGE,
         border_width=1,
-        border_color=COLORS.BORDER,
+        border_color=border_color,
+    )
+
+
+def configure_dropdown_style(dropdown) -> None:
+    """
+    Apply consistent light styling to a CTkOptionMenu.
+
+    Fixes the dark blue dropdown issue by using lighter colors
+    that match the professional theme.
+
+    Args:
+        dropdown: The CTkOptionMenu instance to style
+    """
+    dropdown.configure(
+        fg_color=COLORS.CARD,
+        button_color=COLORS.SECONDARY,
+        button_hover_color=COLORS.SECONDARY_HOVER,
+        dropdown_fg_color=COLORS.CARD,
+        dropdown_hover_color=COLORS.MUTED,
+        text_color=COLORS.TEXT_PRIMARY,
+        corner_radius=SPACING.CORNER_RADIUS,
+    )
+
+
+def configure_label_style(label, style: str = "body") -> None:
+    """
+    Apply consistent styling to a CustomTkinter label.
+
+    Args:
+        label: The CTkLabel instance to style
+        style: 'heading', 'body', 'secondary', or 'muted'
+    """
+    styles = {
+        "heading": (TYPOGRAPHY.section_heading, COLORS.TEXT_PRIMARY),
+        "body": (TYPOGRAPHY.body, COLORS.TEXT_PRIMARY),
+        "secondary": (TYPOGRAPHY.body, COLORS.TEXT_SECONDARY),
+        "muted": (TYPOGRAPHY.small, COLORS.TEXT_MUTED),
+    }
+    font, color = styles.get(style, styles["body"])
+    label.configure(font=font, text_color=color)
+
+
+def get_table_header_style() -> dict:
+    """
+    Get styling dictionary for tksheet headers.
+
+    Returns:
+        Dictionary of header styling options for tksheet
+    """
+    return {
+        "header_bg": COLORS.MUTED,
+        "header_fg": COLORS.TEXT_PRIMARY,
+        "header_grid_fg": COLORS.BORDER,
+        "header_border_fg": COLORS.BORDER,
+        "header_selected_cells_bg": COLORS.SECONDARY,
+        "header_selected_cells_fg": COLORS.TEXT_PRIMARY,
+    }
+
+
+def get_table_body_style() -> dict:
+    """
+    Get styling dictionary for tksheet body/cells.
+
+    Returns:
+        Dictionary of body styling options for tksheet
+    """
+    return {
+        "table_bg": COLORS.CARD,
+        "table_fg": COLORS.TEXT_PRIMARY,
+        "table_grid_fg": COLORS.BORDER,
+        "table_selected_cells_border_fg": COLORS.PRIMARY,
+        "table_selected_cells_bg": COLORS.PRIMARY,
+        "table_selected_cells_fg": COLORS.PRIMARY_FOREGROUND,
+    }
+
+
+def get_table_index_style() -> dict:
+    """
+    Get styling dictionary for tksheet row index.
+
+    Returns:
+        Dictionary of index styling options for tksheet
+    """
+    return {
+        "index_bg": COLORS.MUTED,
+        "index_fg": COLORS.TEXT_SECONDARY,
+        "index_grid_fg": COLORS.BORDER,
+        "index_border_fg": COLORS.BORDER,
+        "index_selected_cells_bg": COLORS.SECONDARY,
+        "index_selected_cells_fg": COLORS.TEXT_PRIMARY,
+    }
+
+
+def configure_table_style(table) -> None:
+    """
+    Apply full styling to a tksheet Table/Sheet widget.
+
+    Args:
+        table: The tksheet Sheet instance to style
+    """
+    # Header styling
+    table.set_options(**get_table_header_style())
+
+    # Body styling
+    table.set_options(**get_table_body_style())
+
+    # Index styling (if shown)
+    table.set_options(**get_table_index_style())
+
+    # General options
+    table.set_options(
+        font=("Segoe UI", 11, "normal"),
+        header_font=("Segoe UI", 11, "bold"),
+        index_font=("Segoe UI", 10, "normal"),
+        outline_thickness=1,
+        outline_color=COLORS.BORDER,
+        frame_bg=COLORS.CARD,
+        top_left_bg=COLORS.MUTED,
+        top_left_fg=COLORS.TEXT_SECONDARY,
     )

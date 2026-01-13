@@ -54,6 +54,8 @@ class DocumentService:
         category: Optional[str] = None,
         review_status: Optional[str] = None,
         search_term: Optional[str] = None,
+        mandatory_read_all: Optional[bool] = None,
+        applicable_entity: Optional[str] = None,
         order_by: str = "doc_ref",
         order_dir: str = "ASC",
     ) -> List[Document]:
@@ -66,6 +68,8 @@ class DocumentService:
             category: Filter by category code
             review_status: Filter by review status (OVERDUE, DUE_SOON, etc.)
             search_term: Search in title, doc_ref, and description
+            mandatory_read_all: Filter by mandatory read status (True/False)
+            applicable_entity: Filter by applicable entity name
             order_by: Column to sort by
             order_dir: Sort direction (ASC or DESC)
 
@@ -86,6 +90,14 @@ class DocumentService:
         if category:
             query += " AND category = ?"
             params.append(category)
+
+        if mandatory_read_all is not None:
+            query += " AND mandatory_read_all = ?"
+            params.append(1 if mandatory_read_all else 0)
+
+        if applicable_entity:
+            query += " AND applicable_entity = ?"
+            params.append(applicable_entity)
 
         if search_term:
             query += " AND (title LIKE ? OR doc_ref LIKE ? OR description LIKE ?)"
@@ -317,9 +329,9 @@ class DocumentService:
                     doc_id, doc_type, doc_ref, title, description,
                     category, owner, approver, status, version,
                     effective_date, last_review_date, next_review_date,
-                    review_frequency, notes, created_at, created_by,
-                    updated_at, updated_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    review_frequency, notes, mandatory_read_all, applicable_entity,
+                    created_at, created_by, updated_at, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     doc_id,
@@ -337,6 +349,8 @@ class DocumentService:
                     data.next_review_date,
                     data.review_frequency,
                     data.notes,
+                    1 if data.mandatory_read_all else 0,
+                    data.applicable_entity,
                     now,
                     user_id,
                     now,
@@ -393,7 +407,14 @@ class DocumentService:
             ("next_review_date", data.next_review_date, document.next_review_date),
             ("review_frequency", data.review_frequency, document.review_frequency),
             ("notes", data.notes, document.notes),
+            ("applicable_entity", data.applicable_entity, document.applicable_entity),
         ]
+
+        # Handle mandatory_read_all separately (boolean field)
+        if data.mandatory_read_all is not None and data.mandatory_read_all != document.mandatory_read_all:
+            updates.append("mandatory_read_all = ?")
+            params.append(1 if data.mandatory_read_all else 0)
+            changes.append(("mandatory_read_all", str(document.mandatory_read_all), str(data.mandatory_read_all)))
 
         for field_name, new_value, old_value in field_mapping:
             if new_value is not None and new_value != old_value:
