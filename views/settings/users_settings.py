@@ -357,6 +357,11 @@ class UsersSettingsView(BaseView):
             "shift_select",
         )
 
+        # Enable text wrapping for better display of long text
+        self.table.set_options(
+            auto_resize_row_height=True,  # Auto-resize rows for wrapped text
+        )
+
         # Track selection changes for bulk deactivate button
         self.table.extra_bindings("cell_select", self._on_selection_changed)
         self.table.extra_bindings("shift_cell_select", self._on_selection_changed)
@@ -709,6 +714,8 @@ class UsersSettingsView(BaseView):
         """Called when the view becomes visible."""
         super().on_show()
         self._refresh_table()
+        # Force resize after view is fully rendered to ensure columns fill space
+        self.after(50, self._resize_columns)
 
     def _on_export_users(self) -> None:
         """Export user list to Excel."""

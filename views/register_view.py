@@ -220,6 +220,11 @@ class RegisterView(BaseView):
             "copy",
         )
 
+        # Enable text wrapping for better display of long text
+        self.table.set_options(
+            auto_resize_row_height=True,  # Auto-resize rows for wrapped text
+        )
+
         # Column proportions (weights) - Title gets the most space
         # [Ref, Title, Type, Category, Owner, Status, Review, Next Review]
         self._column_weights = [1.0, 2.5, 0.8, 1.0, 1.2, 0.9, 0.8, 1.0]
@@ -498,3 +503,5 @@ class RegisterView(BaseView):
         """Called when the view becomes visible."""
         super().on_show()
         self._refresh_table()
+        # Force resize after view is fully rendered to ensure columns fill space
+        self.after(50, self._resize_columns)

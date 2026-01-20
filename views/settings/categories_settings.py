@@ -154,6 +154,11 @@ class CategoriesSettingsView(BaseView):
             "arrowkeys",
         )
 
+        # Enable text wrapping for better display of long text
+        self.table.set_options(
+            auto_resize_row_height=True,  # Auto-resize rows for wrapped text
+        )
+
         # Column proportions (weights) - Name gets the most space
         # [Code, Name, Documents, Sort Order, Status]
         self._column_weights = [0.8, 2.5, 0.8, 0.8, 0.8]
@@ -430,3 +435,5 @@ class CategoriesSettingsView(BaseView):
         """Called when the view becomes visible."""
         super().on_show()
         self._refresh_table()
+        # Force resize after view is fully rendered to ensure columns fill space
+        self.after(50, self._resize_columns)

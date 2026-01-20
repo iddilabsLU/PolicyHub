@@ -231,12 +231,9 @@ class PDFGenerator(BaseReportGenerator):
             for col in self.data.columns:
                 value = row.get(col.key, "")
                 formatted = self._format_value(value)
-                # Wrap long text in Paragraph
-                if len(formatted) > 30:
-                    para = Paragraph(formatted, self.styles["Normal"])
-                    row_data.append(para)
-                else:
-                    row_data.append(formatted)
+                # Wrap all text in Paragraph for consistent formatting
+                para = Paragraph(formatted, self.styles["Normal"])
+                row_data.append(para)
             table_data.append(row_data)
 
         # Calculate column widths - use landscape page width

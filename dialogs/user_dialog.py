@@ -61,6 +61,8 @@ class UserDialog(BaseDialog):
         self._selected_entities: List[str] = []
         self._category_vars: dict = {}
         self._entity_vars: dict = {}
+        self._category_checkboxes: dict = {}  # Store checkbox widgets for filtering
+        self._entity_checkboxes: dict = {}    # Store checkbox widgets for filtering
 
         title = "Edit User" if self.is_edit_mode else "Add User"
         # Increased height to accommodate restrictions section
@@ -397,6 +399,17 @@ class UserDialog(BaseDialog):
         )
         cat_label.pack(anchor="w", pady=(0, 4))
 
+        # Search box for categories
+        cat_search_entry = ctk.CTkEntry(
+            cat_frame,
+            placeholder_text="Search categories...",
+            height=28,
+            font=TYPOGRAPHY.small,
+        )
+        configure_input_style(cat_search_entry)
+        cat_search_entry.pack(fill="x", pady=(0, 4))
+        cat_search_entry.bind("<KeyRelease>", self._on_category_search)
+
         # Scrollable categories list
         cat_scroll = ctk.CTkScrollableFrame(cat_frame, fg_color=COLORS.CARD, height=100)
         cat_scroll.pack(fill="x")
@@ -413,6 +426,7 @@ class UserDialog(BaseDialog):
                 text_color=COLORS.TEXT_PRIMARY,
             )
             cb.pack(anchor="w", pady=2)
+            self._category_checkboxes[cat.code] = cb
 
         # Entities column
         ent_frame = ctk.CTkFrame(cols_frame, fg_color="transparent")
@@ -425,6 +439,17 @@ class UserDialog(BaseDialog):
             text_color=COLORS.TEXT_PRIMARY,
         )
         ent_label.pack(anchor="w", pady=(0, 4))
+
+        # Search box for entities
+        ent_search_entry = ctk.CTkEntry(
+            ent_frame,
+            placeholder_text="Search entities...",
+            height=28,
+            font=TYPOGRAPHY.small,
+        )
+        configure_input_style(ent_search_entry)
+        ent_search_entry.pack(fill="x", pady=(0, 4))
+        ent_search_entry.bind("<KeyRelease>", self._on_entity_search)
 
         # Scrollable entities list
         ent_scroll = ctk.CTkScrollableFrame(ent_frame, fg_color=COLORS.CARD, height=100)
@@ -443,6 +468,7 @@ class UserDialog(BaseDialog):
                     text_color=COLORS.TEXT_PRIMARY,
                 )
                 cb.pack(anchor="w", pady=2)
+                self._entity_checkboxes[entity.name] = cb
         else:
             no_ent = ctk.CTkLabel(
                 ent_scroll,
@@ -491,3 +517,25 @@ class UserDialog(BaseDialog):
     def _get_selected_entities(self) -> List[str]:
         """Get list of selected entity names."""
         return [name for name, var in self._entity_vars.items() if var.get()]
+
+    def _on_category_search(self, event) -> None:
+        """Handle category search input."""
+        search_text = event.widget.get().lower().strip()
+
+        for code, checkbox in self._category_checkboxes.items():
+            checkbox_text = checkbox.cget("text").lower()
+            if search_text in checkbox_text:
+                checkbox.pack(anchor="w", pady=2)
+            else:
+                checkbox.pack_forget()
+
+    def _on_entity_search(self, event) -> None:
+        """Handle entity search input."""
+        search_text = event.widget.get().lower().strip()
+
+        for name, checkbox in self._entity_checkboxes.items():
+            checkbox_text = checkbox.cget("text").lower()
+            if search_text in checkbox_text:
+                checkbox.pack(anchor="w", pady=2)
+            else:
+                checkbox.pack_forget()
