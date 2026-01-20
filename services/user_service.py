@@ -691,3 +691,142 @@ class UserService:
             imported_count=imported_count,
             errors=[],
         )
+
+    # --------------------------------------------------------------------------
+    # User Restrictions (for EDITOR_RESTRICTED role)
+    # --------------------------------------------------------------------------
+
+    def get_user_restrictions(self, user_id: str) -> Dict[str, List[str]]:
+        """
+        Get restrictions for a user.
+
+        Args:
+            user_id: User's ID
+
+        Returns:
+            Dictionary with 'categories' and 'entities' lists
+        """
+        rows = self.db.fetch_all(
+            "SELECT restriction_type, value FROM user_restrictions WHERE user_id = ?",
+            (user_id,),
+        )
+
+        restrictions = {"categories": [], "entities": []}
+        for row in rows:
+            if row["restriction_type"] == "CATEGORY":
+                restrictions["categories"].append(row["value"])
+            elif row["restriction_type"] == "ENTITY":
+                restrictions["entities"].append(row["value"])
+
+        return restrictions
+
+    @require_permission(Permission.MANAGE_USERS)
+    def set_user_restrictions(
+        self,
+        user_id: str,
+        categories: List[str],
+        entities: List[str],
+    ) -> None:
+        """
+        Set restrictions for a user.
+
+        Replaces all existing restrictions.
+
+        Args:
+            user_id: User's ID
+            categories: List of allowed category codes
+            entities: List of allowed entity names
+
+        Raises:
+            PermissionError: If current user lacks permission
+        """
+        now = get_now()
+
+        with self.db.get_connection() as conn:
+            # Delete existing restrictions
+            conn.execute(
+                "DELETE FROM user_restrictions WHERE user_id = ?",
+                (user_id,),
+            )
+
+            # Insert new category restrictions
+            for category in categories:
+                restriction_id = generate_uuid()
+                conn.execute(
+                    """
+                    INSERT INTO user_restrictions (
+                        restriction_id, user_id, restriction_type, value, created_at
+                    ) VALUES (?, ?, 'CATEGORY', ?, ?)
+                    """,
+                    (restriction_id, user_id, category, now),
+                )
+
+            # Insert new entity restrictions
+            for entity in entities:
+                restriction_id = generate_uuid()
+                conn.execute(
+                    """
+                    INSERT INTO user_restrictions (
+                        restriction_id, user_id, restriction_type, value, created_at
+                    ) VALUES (?, ?, 'ENTITY', ?, ?)
+                    """,
+                    (restriction_id, user_id, entity, now),
+                )
+
+        logger.info(
+            f"User restrictions set: {user_id} - "
+            f"{len(categories)} categories, {len(entities)} entities"
+        )
+
+    def clear_user_restrictions(self, user_id: str) -> None:
+        """
+        Clear all restrictions for a user.
+
+        Args:
+            user_id: User's ID
+        """
+        with self.db.get_connection() as conn:
+            conn.execute(
+                "DELETE FROM user_restrictions WHERE user_id = ?",
+                (user_id,),
+            )
+        logger.info(f"User restrictions cleared: {user_id}")
+
+    def check_document_access(
+        self,
+        user_id: str,
+        document_category: str,
+        document_entities: Optional[str],
+    ) -> bool:
+        """
+        Check if a restricted editor can access a document.
+
+        Uses OR logic: access is granted if document matches
+        any allowed category OR any allowed entity.
+
+        Args:
+            user_id: User's ID
+            document_category: Document's category code
+            document_entities: Document's semicolon-separated entities (or None)
+
+        Returns:
+            True if user has access to the document
+        """
+        restrictions = self.get_user_restrictions(user_id)
+
+        # If no restrictions, deny access (safety check)
+        if not restrictions["categories"] and not restrictions["entities"]:
+            return False
+
+        # Check category match
+        if document_category in restrictions["categories"]:
+            return True
+
+        # Check entity match (semicolon-separated entities)
+        if document_entities and restrictions["entities"]:
+            doc_entity_list = [e.strip() for e in document_entities.split(";") if e.strip()]
+            for entity in doc_entity_list:
+                if entity in restrictions["entities"]:
+                    return True
+
+        return False

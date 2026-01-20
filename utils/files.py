@@ -140,7 +140,9 @@ def generate_attachment_path(doc_ref: str, filename: str, version: str) -> str:
     """
     Generate the relative path for storing an attachment.
 
-    Structure: {doc_ref}/{doc_ref}_{version}_{filename}
+    Structure: {doc_ref}/{doc_ref}_v{version}_{timestamp}_{original_name}
+
+    This ensures each file is unique and previous versions are preserved.
 
     Args:
         doc_ref: Document reference code (e.g., POL-AML-001)
@@ -150,11 +152,13 @@ def generate_attachment_path(doc_ref: str, filename: str, version: str) -> str:
     Returns:
         Relative path for the attachment
     """
-    sanitized_filename = sanitize_filename(filename)
-    _, ext = os.path.splitext(sanitized_filename)
+    from datetime import datetime
 
-    # Create a versioned filename
-    versioned_name = f"{doc_ref}_v{version}{ext}"
+    sanitized_filename = sanitize_filename(filename)
+
+    # Create a unique filename with version, timestamp, and original name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    versioned_name = f"{doc_ref}_v{version}_{timestamp}_{sanitized_filename}"
 
     return f"{doc_ref}/{versioned_name}"
 

@@ -237,8 +237,19 @@ class AdminCreationView(CenteredView):
                 email=email,
             )
 
+            # Set require_login to false for new databases (bypass permission check)
+            # This is a new database, so login should not be required by default
+            from services.settings_service import SettingsService
+            settings_service = SettingsService(self.db)
+            settings_service.set_require_login_direct(False)
+
             # Auto-login
             self.auth_service.login(username, password)
+
+            # Seed sample documents for testing
+            from services.document_service import DocumentService
+            doc_service = DocumentService(self.db)
+            doc_service.seed_sample_documents()
 
             self.status_label.configure(
                 text="Account created successfully!",

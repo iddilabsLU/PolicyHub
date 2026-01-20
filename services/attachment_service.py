@@ -6,8 +6,12 @@ Handles file attachment management for documents.
 
 import logging
 import os
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+
+from core.config import ConfigManager
 
 from app.constants import (
     ALLOWED_EXTENSIONS,
@@ -244,10 +248,71 @@ class AttachmentService:
             uploaded_by=user_id,
         )
 
+    def _get_deleted_folder(self, doc_ref: str) -> Path:
+        """
+        Get the _Deleted subfolder for a document.
+
+        Args:
+            doc_ref: Document reference code
+
+        Returns:
+            Path to the deleted folder for this document
+        """
+        config = ConfigManager.get_instance()
+        shared_folder = config.get_shared_folder_path()
+        if not shared_folder:
+            raise ValueError("Shared folder not configured")
+        return Path(shared_folder) / "_Deleted" / doc_ref
+
+    def _get_unique_deleted_filename(self, folder: Path, filename: str) -> str:
+        """
+        Generate a unique filename for the deleted folder.
+
+        Adds a timestamp to avoid conflicts with previously deleted files
+        that had the same name.
+
+        Args:
+            folder: The deleted folder path
+            filename: Original filename
+
+        Returns:
+            Unique filename with timestamp
+        """
+        base, ext = os.path.splitext(filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_name = f"{base}_deleted_{timestamp}{ext}"
+
+        # Handle unlikely collision (same second)
+        counter = 1
+        while (folder / new_name).exists():
+            new_name = f"{base}_deleted_{timestamp}_{counter}{ext}"
+            counter += 1
+
+        return new_name
+
+    def _get_doc_ref_for_attachment(self, doc_id: str) -> Optional[str]:
+        """
+        Get the document reference code for an attachment's document.
+
+        Args:
+            doc_id: Document ID
+
+        Returns:
+            Document reference or None
+        """
+        row = self.db.fetch_one(
+            "SELECT doc_ref FROM documents WHERE doc_id = ?",
+            (doc_id,),
+        )
+        return row["doc_ref"] if row else None
+
     @require_permission(Permission.EDIT_DOCUMENT)
     def delete_attachment(self, attachment_id: str) -> bool:
         """
-        Delete an attachment.
+        Delete an attachment (soft delete - moves to _Deleted folder).
+
+        The file is moved to a _Deleted/{doc_ref}/ folder rather than
+        being permanently deleted, allowing for recovery if needed.
 
         Args:
             attachment_id: Attachment ID to delete
@@ -263,11 +328,34 @@ class AttachmentService:
         if not attachment:
             raise ValueError(f"Attachment not found: {attachment_id}")
 
-        # Delete file from disk
-        file_path = get_attachment_absolute_path(attachment.file_path)
-        if file_path and file_path.exists():
-            if not delete_file(file_path):
-                logger.warning(f"Failed to delete file: {file_path}")
+        # Get document reference for folder organization
+        doc_ref = self._get_doc_ref_for_attachment(attachment.doc_id)
+        if not doc_ref:
+            doc_ref = "unknown"
+
+        # Move file to _Deleted folder instead of deleting
+        source_path = get_attachment_absolute_path(attachment.file_path)
+        if source_path and source_path.exists():
+            try:
+                # Get the deleted folder for this document
+                deleted_folder = self._get_deleted_folder(doc_ref)
+                deleted_folder.mkdir(parents=True, exist_ok=True)
+
+                # Generate unique filename
+                dest_filename = self._get_unique_deleted_filename(
+                    deleted_folder, attachment.filename
+                )
+                dest_path = deleted_folder / dest_filename
+
+                # Move file
+                shutil.move(str(source_path), str(dest_path))
+                logger.info(f"Attachment moved to deleted folder: {dest_path}")
+
+            except Exception as e:
+                logger.error(f"Failed to move file to deleted folder: {e}")
+                # Fall back to regular delete if move fails
+                if not delete_file(source_path):
+                    logger.warning(f"Failed to delete file: {source_path}")
 
         # Delete database record
         with self.db.get_connection() as conn:

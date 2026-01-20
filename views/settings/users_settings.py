@@ -168,6 +168,9 @@ class UsersSettingsView(BaseView):
         configure_button_style(export_btn, "secondary")
         export_btn.pack(side="right")
 
+        # Authentication Settings card
+        self._build_auth_settings_card()
+
         # Table container
         table_card = ctk.CTkFrame(self, fg_color=COLORS.CARD)
         configure_card_style(table_card, with_shadow=True)
@@ -192,6 +195,130 @@ class UsersSettingsView(BaseView):
             text_color=COLORS.TEXT_SECONDARY,
         )
         self.status_label.pack(side="bottom", anchor="w", padx=SPACING.CARD_PADDING, pady=8)
+
+    def _build_auth_settings_card(self) -> None:
+        """Build the authentication settings card."""
+        from services.settings_service import SettingsService
+
+        # Initialize settings service
+        self.settings_service = SettingsService(self.app.db)
+
+        # Auth settings card
+        auth_card = ctk.CTkFrame(self, fg_color=COLORS.CARD)
+        configure_card_style(auth_card, with_shadow=True)
+        auth_card.pack(
+            fill="x",
+            padx=SPACING.WINDOW_PADDING,
+            pady=(0, 12),
+        )
+
+        # Card content
+        content = ctk.CTkFrame(auth_card, fg_color="transparent")
+        content.pack(fill="x", padx=SPACING.CARD_PADDING, pady=SPACING.CARD_PADDING)
+
+        # Card title
+        title = ctk.CTkLabel(
+            content,
+            text="Authentication Settings",
+            font=TYPOGRAPHY.section_heading,
+            text_color=COLORS.TEXT_PRIMARY,
+        )
+        title.pack(anchor="w", pady=(0, 12))
+
+        # Settings row container
+        settings_row = ctk.CTkFrame(content, fg_color="transparent")
+        settings_row.pack(fill="x")
+
+        # Left side: Require Login toggle
+        left_frame = ctk.CTkFrame(settings_row, fg_color="transparent")
+        left_frame.pack(side="left", fill="x", expand=True)
+
+        # Require Login setting
+        login_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
+        login_frame.pack(anchor="w")
+
+        self.require_login_var = ctk.BooleanVar(
+            value=self.settings_service.get_require_login()
+        )
+        require_login_switch = ctk.CTkSwitch(
+            login_frame,
+            text="Require Login",
+            variable=self.require_login_var,
+            command=self._on_require_login_changed,
+            font=TYPOGRAPHY.body,
+            text_color=COLORS.TEXT_PRIMARY,
+        )
+        require_login_switch.pack(side="left")
+
+        # Help text for require login
+        login_help = ctk.CTkLabel(
+            left_frame,
+            text="When disabled, the app will automatically log in as the admin user.",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_MUTED,
+        )
+        login_help.pack(anchor="w", pady=(4, 0))
+
+        # Right side: Master Password button
+        right_frame = ctk.CTkFrame(settings_row, fg_color="transparent")
+        right_frame.pack(side="right")
+
+        master_pwd_btn = ctk.CTkButton(
+            right_frame,
+            text="Change Master Password",
+            command=self._on_change_master_password,
+            width=180,
+        )
+        configure_button_style(master_pwd_btn, "secondary")
+        master_pwd_btn.pack()
+
+        # Help text for master password
+        pwd_help = ctk.CTkLabel(
+            right_frame,
+            text="Safety net for forgotten admin passwords",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_MUTED,
+        )
+        pwd_help.pack(anchor="e", pady=(4, 0))
+
+    def _on_require_login_changed(self) -> None:
+        """Handle require login toggle change."""
+        require_login = self.require_login_var.get()
+
+        try:
+            self.settings_service.set_require_login(require_login)
+
+            status = "enabled" if require_login else "disabled"
+            InfoDialog.show_success(
+                self.winfo_toplevel(),
+                "Setting Updated",
+                f"Login requirement has been {status}.\n\n"
+                f"{'Users will need to log in to access the application.' if require_login else 'The application will auto-login as the admin user.'}",
+            )
+
+        except PermissionError:
+            # Revert the switch
+            self.require_login_var.set(not require_login)
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "Permission Denied",
+                "You do not have permission to change this setting.",
+            )
+        except Exception as e:
+            # Revert the switch
+            self.require_login_var.set(not require_login)
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "Error",
+                f"Failed to update setting: {str(e)}",
+            )
+
+    def _on_change_master_password(self) -> None:
+        """Handle change master password button click."""
+        from dialogs.master_password_dialog import MasterPasswordDialog
+
+        dialog = MasterPasswordDialog(self.winfo_toplevel(), self.app.db)
+        dialog.show()
 
     def _build_tksheet_table(self, parent) -> None:
         """Build the tksheet table."""

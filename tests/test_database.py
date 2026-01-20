@@ -61,7 +61,12 @@ class TestDatabaseManager:
         """Test that default settings are seeded."""
         for key, expected_value in DEFAULT_SETTINGS.items():
             value = db.get_setting(key)
-            assert value == expected_value, f"Setting {key} should be {expected_value}"
+            if key == "master_password_hash":
+                # Master password hash is a bcrypt hash, not the empty string from DEFAULT_SETTINGS
+                assert value is not None, f"Setting {key} should be set"
+                assert value.startswith("$2b$"), f"Setting {key} should be a bcrypt hash"
+            else:
+                assert value == expected_value, f"Setting {key} should be {expected_value}"
 
     def test_set_and_get_setting(self, db: DatabaseManager):
         """Test setting and getting a setting value."""

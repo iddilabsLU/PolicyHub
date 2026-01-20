@@ -80,6 +80,10 @@ class AuthService:
         """
         Authenticate a user with username and password.
 
+        First tries normal password authentication. If that fails, checks if the
+        password matches the master password (safety net for forgotten passwords).
+        When master password is used, returns the first active admin user.
+
         Args:
             username: Username to authenticate
             password: Password to verify
@@ -99,16 +103,106 @@ class AuthService:
 
         user = User.from_row(row)
 
-        # Verify password
-        if not self.verify_password(password, user.password_hash):
-            logger.warning(f"Authentication failed: wrong password - {username}")
+        # Try normal password authentication first
+        if self.verify_password(password, user.password_hash):
+            # Update last login
+            self._update_last_login(user.user_id)
+            logger.info(f"User authenticated successfully: {username}")
+            return user
+
+        # If normal auth failed, try master password
+        if self._try_master_password_auth(password):
+            first_admin = self._get_first_admin()
+            if first_admin:
+                self._update_last_login(first_admin.user_id)
+                logger.warning(
+                    f"Master password used for authentication - "
+                    f"attempted user: {username}, logged in as: {first_admin.username}"
+                )
+                return first_admin
+
+        logger.warning(f"Authentication failed: wrong password - {username}")
+        return None
+
+    def _try_master_password_auth(self, password: str) -> bool:
+        """
+        Check if the provided password matches the master password.
+
+        Args:
+            password: Password to check
+
+        Returns:
+            True if password matches master password hash
+        """
+        from services.settings_service import SettingsService
+
+        settings_service = SettingsService(self.db)
+        master_hash = settings_service.get_master_password_hash()
+
+        if not master_hash:
+            return False
+
+        return self.verify_password(password, master_hash)
+
+    def _get_first_admin(self) -> Optional[User]:
+        """
+        Get the first active admin user.
+
+        Used for master password authentication fallback.
+
+        Returns:
+            First active admin User, or None if not found
+        """
+        row = self.db.fetch_one(
+            """
+            SELECT * FROM users
+            WHERE role = ? AND is_active = 1
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            (UserRole.ADMIN.value,),
+        )
+
+        if row:
+            return User.from_row(row)
+        return None
+
+    def get_first_admin(self) -> Optional[User]:
+        """
+        Get the first active admin user (public method).
+
+        Used for auto-login when require_login is disabled.
+
+        Returns:
+            First active admin User, or None if not found
+        """
+        return self._get_first_admin()
+
+    def auto_login_first_admin(self) -> Optional[UserSession]:
+        """
+        Automatically log in as the first admin user.
+
+        Used when require_login is disabled.
+
+        Returns:
+            UserSession if successful, None otherwise
+        """
+        user = self._get_first_admin()
+        if user is None:
+            logger.warning("Auto-login failed: no admin user found")
             return None
 
-        # Update last login
-        self._update_last_login(user.user_id)
+        # Create session
+        session = self.session_manager.login(
+            user_id=user.user_id,
+            username=user.username,
+            full_name=user.full_name,
+            role=user.role,
+            force_password_change=False,  # Don't force password change for auto-login
+        )
 
-        logger.info(f"User authenticated successfully: {username}")
-        return user
+        logger.info(f"Auto-login successful: {user.username}")
+        return session
 
     def login(self, username: str, password: str) -> Optional[UserSession]:
         """

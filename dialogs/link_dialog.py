@@ -53,7 +53,7 @@ class LinkDialog(BaseDialog):
         self.selected_doc: Optional[dict] = None
         self.available_docs: List[dict] = []
 
-        super().__init__(parent, "Link Documents", width=600, height=500)
+        super().__init__(parent, "Link Documents", width=600, height=550)
         self._build_ui()
         self._load_available_documents()
 
@@ -63,9 +63,56 @@ class LinkDialog(BaseDialog):
         main_frame = ctk.CTkFrame(self, fg_color="transparent")
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # IMPORTANT: Pack buttons FIRST at bottom to guarantee visibility
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(side="bottom", fill="x", pady=(15, 0))
+
+        self.link_btn = ctk.CTkButton(
+            button_frame,
+            text="Create Link",
+            command=self._on_create_link,
+            width=120,
+            height=36,
+            state="disabled",
+        )
+        configure_button_style(self.link_btn, "primary")
+        self.link_btn.pack(side="right", padx=(5, 0))
+
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self._on_cancel,
+            width=100,
+            height=36,
+        )
+        configure_button_style(cancel_btn, "secondary")
+        cancel_btn.pack(side="right")
+
+        # Selected document display (pack second from bottom)
+        self.selected_frame = ctk.CTkFrame(
+            main_frame,
+            fg_color=COLORS.MUTED,
+            corner_radius=SPACING.CORNER_RADIUS,
+            height=45,
+        )
+        self.selected_frame.pack(side="bottom", fill="x", pady=(10, 0))
+        self.selected_frame.pack_propagate(False)
+
+        self.selected_label = ctk.CTkLabel(
+            self.selected_frame,
+            text="No document selected",
+            font=TYPOGRAPHY.body,
+            text_color=COLORS.TEXT_SECONDARY,
+        )
+        self.selected_label.pack(expand=True)
+
+        # Content area (fills remaining space above)
+        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        content_frame.pack(side="top", fill="both", expand=True)
+
         # Title
         title_label = ctk.CTkLabel(
-            main_frame,
+            content_frame,
             text=f"Create link from {self.source_doc_ref}",
             font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_PRIMARY,
@@ -73,7 +120,7 @@ class LinkDialog(BaseDialog):
         title_label.pack(anchor="w", pady=(0, 15))
 
         # Link type selection
-        type_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        type_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
         type_frame.pack(fill="x", pady=(0, 15))
 
         ctk.CTkLabel(
@@ -104,7 +151,7 @@ class LinkDialog(BaseDialog):
         self._link_type_map = {t[1]: t[0] for t in link_types}
 
         # Search box
-        search_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        search_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
         search_frame.pack(fill="x", pady=(0, 10))
 
         ctk.CTkLabel(
@@ -128,57 +175,14 @@ class LinkDialog(BaseDialog):
 
         # Document list
         list_frame = ctk.CTkFrame(
-            main_frame,
+            content_frame,
             fg_color=COLORS.CARD,
             corner_radius=SPACING.CORNER_RADIUS,
         )
-        list_frame.pack(fill="both", expand=True, pady=(0, 15))
+        list_frame.pack(fill="both", expand=True)
 
         self.doc_list_scroll = ctk.CTkScrollableFrame(list_frame, fg_color="transparent")
         self.doc_list_scroll.pack(fill="both", expand=True, padx=5, pady=5)
-
-        # Selected document display
-        self.selected_frame = ctk.CTkFrame(
-            main_frame,
-            fg_color=COLORS.MUTED,
-            corner_radius=SPACING.CORNER_RADIUS,
-            height=50,
-        )
-        self.selected_frame.pack(fill="x", pady=(0, 15))
-        self.selected_frame.pack_propagate(False)
-
-        self.selected_label = ctk.CTkLabel(
-            self.selected_frame,
-            text="No document selected",
-            font=TYPOGRAPHY.body,
-            text_color=COLORS.TEXT_SECONDARY,
-        )
-        self.selected_label.pack(expand=True)
-
-        # Buttons
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(fill="x")
-
-        cancel_btn = ctk.CTkButton(
-            button_frame,
-            text="Cancel",
-            command=self._on_cancel,
-            width=100,
-            height=36,
-        )
-        configure_button_style(cancel_btn, "secondary")
-        cancel_btn.pack(side="right", padx=5)
-
-        self.link_btn = ctk.CTkButton(
-            button_frame,
-            text="Create Link",
-            command=self._on_create_link,
-            width=120,
-            height=36,
-            state="disabled",
-        )
-        configure_button_style(self.link_btn, "primary")
-        self.link_btn.pack(side="right", padx=5)
 
     def _on_link_type_change(self, value: str) -> None:
         """Handle link type change."""

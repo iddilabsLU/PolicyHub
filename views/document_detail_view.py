@@ -5,8 +5,10 @@ Displays complete information for a single document with actions.
 """
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
+from tkinter import filedialog
 from typing import TYPE_CHECKING, Callable, List, Optional
 
 import customtkinter as ctk
@@ -190,9 +192,10 @@ class DocumentDetailView(BaseView):
             fg_color=COLORS.CARD,
             segmented_button_fg_color=COLORS.MUTED,
             segmented_button_selected_color=COLORS.PRIMARY,
-            segmented_button_unselected_color=COLORS.MUTED,
-            text_color=COLORS.TEXT_PRIMARY,
+            segmented_button_unselected_color=COLORS.SECONDARY,  # Warm grey for unselected
             segmented_button_selected_hover_color=COLORS.PRIMARY_HOVER,
+            segmented_button_unselected_hover_color=COLORS.BORDER,
+            command=self._on_tab_changed,  # Callback to fix text colors
         )
         self.tabview.pack(
             fill="both",
@@ -212,6 +215,30 @@ class DocumentDetailView(BaseView):
         self._build_attachments_tab()
         self._build_links_tab()
         self._build_history_tab()
+
+        # Fix initial tab text colors
+        self._fix_tab_text_colors()
+
+    def _on_tab_changed(self) -> None:
+        """Handle tab change to fix text colors."""
+        self._fix_tab_text_colors()
+
+    def _fix_tab_text_colors(self) -> None:
+        """Fix text colors for segmented button tabs."""
+        try:
+            segmented_button = self.tabview._segmented_button
+            current_tab = self.tabview.get()
+
+            # Update each button's text color based on selection state
+            for tab_name, button in segmented_button._buttons_dict.items():
+                if tab_name == current_tab:
+                    # Selected - white text on dark background
+                    button.configure(text_color=COLORS.PRIMARY_FOREGROUND)
+                else:
+                    # Unselected - dark text on light background
+                    button.configure(text_color=COLORS.TEXT_PRIMARY)
+        except Exception:
+            pass  # Ignore errors if internal structure changes
 
     def _build_details_tab(self) -> None:
         """Build the details tab content."""
@@ -244,17 +271,29 @@ class DocumentDetailView(BaseView):
         self._add_field(fields_frame, "Approver", self.document.approver or "-", row, 1)
         row += 1
 
-        # Row 4: Review Frequency, Review Status
+        # Row 4: Applicable Entities, Mandatory Read
+        if self.document.applicable_entity:
+            # Format semicolon-separated entities as comma-separated for display
+            entities = self.document.applicable_entity.split(";")
+            entity_value = ", ".join(entities) if len(entities) <= 3 else f"{entities[0]}, {entities[1]} +{len(entities)-2} more"
+        else:
+            entity_value = "All Entities"
+        mandatory_value = "Yes" if self.document.mandatory_read_all else "No"
+        self._add_field(fields_frame, "Applicable Entities", entity_value, row, 0)
+        self._add_field(fields_frame, "Mandatory Read", mandatory_value, row, 1)
+        row += 1
+
+        # Row 5: Review Frequency, Review Status
         self._add_field(fields_frame, "Review Frequency", self.document.frequency_display, row, 0)
         self._add_field(fields_frame, "Review Status", self.document.review_status_display, row, 1)
         row += 1
 
-        # Row 5: Effective Date, Last Review
+        # Row 6: Effective Date, Last Review
         self._add_field(fields_frame, "Effective Date", format_date(self.document.effective_date), row, 0)
         self._add_field(fields_frame, "Last Reviewed", format_date(self.document.last_review_date), row, 1)
         row += 1
 
-        # Row 6: Next Review with action
+        # Row 7: Next Review with action
         next_review_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
         next_review_frame.grid(row=row, column=0, sticky="w", padx=10, pady=10)
 
@@ -399,6 +438,17 @@ class DocumentDetailView(BaseView):
             configure_button_style(upload_btn, "primary")
             upload_btn.pack(side="right")
 
+        # Download All button
+        self.download_all_btn = ctk.CTkButton(
+            header_frame,
+            text="Download All",
+            command=self._on_download_all_attachments,
+            width=110,
+            height=32,
+        )
+        configure_button_style(self.download_all_btn, "secondary")
+        self.download_all_btn.pack(side="right", padx=(0, 10))
+
         # Scrollable list container
         self.attachments_scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         self.attachments_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
@@ -413,6 +463,13 @@ class DocumentDetailView(BaseView):
             widget.destroy()
 
         attachments = self.attachment_service.get_attachments_for_document(self.document.doc_id)
+
+        # Update Download All button state
+        if hasattr(self, 'download_all_btn'):
+            if attachments:
+                self.download_all_btn.configure(state="normal")
+            else:
+                self.download_all_btn.configure(state="disabled")
 
         if not attachments:
             ctk.CTkLabel(
@@ -579,6 +636,66 @@ class DocumentDetailView(BaseView):
             except Exception as e:
                 InfoDialog.show_error(self.winfo_toplevel(), "Error", str(e))
 
+    def _on_download_all_attachments(self) -> None:
+        """Handle download all attachments button click."""
+        attachments = self.attachment_service.get_attachments_for_document(self.document.doc_id)
+
+        if not attachments:
+            InfoDialog.show_info(
+                self.winfo_toplevel(),
+                "No Attachments",
+                "There are no attachments to download.",
+            )
+            return
+
+        # Ask for destination folder
+        dest_folder = filedialog.askdirectory(
+            parent=self.winfo_toplevel(),
+            title="Select Download Folder",
+        )
+
+        if not dest_folder:
+            return
+
+        dest_path = Path(dest_folder)
+        downloaded = 0
+        failed = []
+
+        for attachment in attachments:
+            try:
+                # Get the source file path
+                source_path = self.attachment_service.open_attachment(attachment.attachment_id)
+                if source_path and source_path.exists():
+                    # Copy to destination
+                    dest_file = dest_path / attachment.filename
+                    # Handle duplicate filenames
+                    counter = 1
+                    while dest_file.exists():
+                        stem = attachment.filename.rsplit('.', 1)[0] if '.' in attachment.filename else attachment.filename
+                        ext = '.' + attachment.filename.rsplit('.', 1)[1] if '.' in attachment.filename else ''
+                        dest_file = dest_path / f"{stem}_{counter}{ext}"
+                        counter += 1
+                    shutil.copy2(source_path, dest_file)
+                    downloaded += 1
+                else:
+                    failed.append(attachment.filename)
+            except Exception as e:
+                failed.append(f"{attachment.filename}: {str(e)}")
+
+        # Show result
+        if failed:
+            InfoDialog.show_info(
+                self.winfo_toplevel(),
+                "Download Complete",
+                f"Downloaded {downloaded} file(s).\n\nFailed to download:\n" + "\n".join(failed[:5]),
+            )
+        else:
+            InfoDialog.show_info(
+                self.winfo_toplevel(),
+                "Download Complete",
+                f"Successfully downloaded {downloaded} file(s) to:\n{dest_folder}",
+            )
+
     def _build_links_tab(self) -> None:
         """Build the linked documents tab with link management."""
         tab = self.tabview.tab("Linked Documents")
@@ -641,15 +758,23 @@ class DocumentDetailView(BaseView):
             self.links_scroll,
             fg_color=COLORS.MUTED,
             corner_radius=SPACING.CORNER_RADIUS,
+            cursor="hand2",
         )
         row.pack(fill="x", pady=5)
 
-        inner = ctk.CTkFrame(row, fg_color="transparent")
+        # Make entire row clickable (except action buttons)
+        row.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
+        row.bind("<Enter>", lambda e: row.configure(fg_color=COLORS.BORDER))
+        row.bind("<Leave>", lambda e: row.configure(fg_color=COLORS.MUTED))
+
+        inner = ctk.CTkFrame(row, fg_color="transparent", cursor="hand2")
         inner.pack(fill="x", padx=15, pady=12)
+        inner.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
 
         # Left side: link info
-        info_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        info_frame = ctk.CTkFrame(inner, fg_color="transparent", cursor="hand2")
         info_frame.pack(side="left", fill="x", expand=True)
+        info_frame.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
 
         # Relationship text
         relationship = linked_doc.link.get_relationship_text(linked_doc.is_parent)
@@ -660,12 +785,15 @@ class DocumentDetailView(BaseView):
             text=rel_text,
             font=TYPOGRAPHY.small,
             text_color=COLORS.TEXT_SECONDARY,
+            cursor="hand2",
         )
         rel_label.pack(anchor="w")
+        rel_label.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
 
         # Document reference and title
-        doc_row = ctk.CTkFrame(info_frame, fg_color="transparent")
+        doc_row = ctk.CTkFrame(info_frame, fg_color="transparent", cursor="hand2")
         doc_row.pack(anchor="w")
+        doc_row.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
 
         ref_label = ctk.CTkLabel(
             doc_row,
@@ -684,8 +812,10 @@ class DocumentDetailView(BaseView):
             text=title_text,
             font=TYPOGRAPHY.body,
             text_color=COLORS.TEXT_PRIMARY,
+            cursor="hand2",
         )
         title_label.pack(side="left")
+        title_label.bind("<Button-1>", lambda e, ld=linked_doc: self._on_click_linked_doc(ld))
 
         # Right side: action buttons
         actions = ctk.CTkFrame(inner, fg_color="transparent")
@@ -749,23 +879,30 @@ class DocumentDetailView(BaseView):
         # Get the full document
         target_doc = self.doc_service.get_document_by_id(target_doc_id)
         if target_doc:
-            # Navigate to the linked document
-            # This will trigger the main view to show the document detail
-            if hasattr(self.app, 'main_view') and hasattr(self.app.main_view, '_show_document_detail'):
-                self.app.main_view._show_document_detail(target_doc)
+            # Navigate to the linked document via main_view
+            main_view = self.app.current_view
+            if hasattr(main_view, "_show_document_detail"):
+                main_view._show_document_detail(target_doc)
             else:
-                InfoDialog.show_info(
+                InfoDialog.show_error(
                     self.winfo_toplevel(),
-                    "Navigate",
-                    f"Document: {linked_doc.doc_ref}",
+                    "Navigation Error",
+                    "Cannot navigate to the linked document.",
                 )
+        else:
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "Document Not Found",
+                f"Could not find document {linked_doc.doc_ref}.",
+            )
 
     def _on_remove_link(self, linked_doc: LinkedDocument) -> None:
         """Handle remove link button click."""
-        if ConfirmDialog.ask_confirm(
+        if ConfirmDialog.ask(
             self.winfo_toplevel(),
             "Remove Link",
             f"Remove link to {linked_doc.doc_ref}?",
+            confirm_text="Remove",
         ):
             try:
                 self.link_service.delete_link(linked_doc.link.link_id)

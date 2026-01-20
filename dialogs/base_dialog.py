@@ -58,7 +58,18 @@ class BaseDialog(ctk.CTkToplevel):
         super().__init__(parent)
 
         self.title(title)
-        self.geometry(f"{width}x{height}")
+
+        # Get screen dimensions and cap dialog size at 90% of screen
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        max_width = int(screen_width * 0.9)
+        max_height = int(screen_height * 0.85)
+
+        # Ensure dialog fits on screen
+        final_width = min(width, max_width)
+        final_height = min(height, max_height)
+
+        self.geometry(f"{final_width}x{final_height}")
         self.resizable(resizable, resizable)
         self.configure(fg_color=COLORS.BACKGROUND)
 
@@ -67,7 +78,7 @@ class BaseDialog(ctk.CTkToplevel):
         self.grab_set()
 
         # Center on parent
-        self._center_on_parent(parent, width, height)
+        self._center_on_parent(parent, final_width, final_height)
 
         # Close on Escape
         self.bind("<Escape>", lambda e: self._on_cancel())

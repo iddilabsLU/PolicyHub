@@ -4,7 +4,7 @@ PolicyHub User Dialog
 Dialog for adding and editing users.
 """
 
-from typing import Optional
+from typing import List, Optional
 
 import customtkinter as ctk
 
@@ -21,6 +21,8 @@ from core.database import DatabaseManager
 from dialogs.base_dialog import BaseDialog
 from dialogs.confirm_dialog import InfoDialog
 from models.user import User, UserCreate, UserUpdate
+from services.category_service import CategoryService
+from services.entity_service import EntityService
 from services.user_service import UserService
 from utils.validators import validate_email, validate_password, validate_username
 
@@ -49,13 +51,23 @@ class UserDialog(BaseDialog):
         """
         self.db = db
         self.user_service = UserService(db)
+        self.category_service = CategoryService(db)
+        self.entity_service = EntityService(db)
         self.user = user
         self.is_edit_mode = user is not None
 
-        title = "Edit User" if self.is_edit_mode else "Add User"
-        height = 400 if self.is_edit_mode else 480
+        # Track selected restrictions
+        self._selected_categories: List[str] = []
+        self._selected_entities: List[str] = []
+        self._category_vars: dict = {}
+        self._entity_vars: dict = {}
 
-        super().__init__(parent, title, width=450, height=height)
+        title = "Edit User" if self.is_edit_mode else "Add User"
+        # Increased height to accommodate restrictions section
+        # Taller for new users (password fields) and when restrictions might show
+        height = 600 if self.is_edit_mode else 680
+
+        super().__init__(parent, title, width=500, height=height, resizable=True)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -118,6 +130,7 @@ class UserDialog(BaseDialog):
             width=200,
             font=TYPOGRAPHY.body,
             dropdown_font=TYPOGRAPHY.body,
+            command=self._on_role_changed,
         )
         configure_dropdown_style(self.role_dropdown)
         self.role_dropdown.pack(anchor="w", pady=(0, 12))
@@ -130,6 +143,10 @@ class UserDialog(BaseDialog):
                 self.role_var.set(UserRole.VIEWER.display_name)
         else:
             self.role_var.set(UserRole.VIEWER.display_name)
+
+        # Restrictions section (for EDITOR_RESTRICTED role)
+        self.restrictions_frame = ctk.CTkFrame(form, fg_color=COLORS.MUTED, corner_radius=8)
+        self._build_restrictions_section()
 
         # Password fields (only in add mode)
         if not self.is_edit_mode:
@@ -278,6 +295,18 @@ class UserDialog(BaseDialog):
                 InfoDialog.show_error(self, "Password Mismatch", "Passwords do not match.")
                 return
 
+        # Validate restrictions for EDITOR_RESTRICTED
+        if role_value == UserRole.EDITOR_RESTRICTED.value:
+            selected_categories = self._get_selected_categories()
+            selected_entities = self._get_selected_entities()
+            if not selected_categories and not selected_entities:
+                InfoDialog.show_error(
+                    self,
+                    "Restrictions Required",
+                    "Please select at least one category or entity for the restricted editor.",
+                )
+                return
+
         try:
             if self.is_edit_mode:
                 # Update user
@@ -288,6 +317,18 @@ class UserDialog(BaseDialog):
                     is_active=self.active_var.get(),
                 )
                 self.user_service.update_user(self.user.user_id, update_data)
+
+                # Update restrictions if EDITOR_RESTRICTED
+                if role_value == UserRole.EDITOR_RESTRICTED.value:
+                    self.user_service.set_user_restrictions(
+                        self.user.user_id,
+                        self._get_selected_categories(),
+                        self._get_selected_entities(),
+                    )
+                else:
+                    # Clear restrictions if not EDITOR_RESTRICTED
+                    self.user_service.clear_user_restrictions(self.user.user_id)
+
                 self.result = True
             else:
                 # Create user
@@ -298,7 +339,16 @@ class UserDialog(BaseDialog):
                     email=email,
                     role=role_value,
                 )
-                self.user_service.create_user(create_data)
+                created_user = self.user_service.create_user(create_data)
+
+                # Set restrictions if EDITOR_RESTRICTED
+                if role_value == UserRole.EDITOR_RESTRICTED.value and created_user:
+                    self.user_service.set_user_restrictions(
+                        created_user.user_id,
+                        self._get_selected_categories(),
+                        self._get_selected_entities(),
+                    )
+
                 self.result = True
 
             self.destroy()
@@ -309,3 +359,135 @@ class UserDialog(BaseDialog):
             InfoDialog.show_error(self, "Validation Error", str(e))
         except Exception as e:
             InfoDialog.show_error(self, "Error", str(e))
+
+    def _build_restrictions_section(self) -> None:
+        """Build the restrictions section for EDITOR_RESTRICTED role."""
+        # Header
+        header = ctk.CTkLabel(
+            self.restrictions_frame,
+            text="Access Restrictions",
+            font=TYPOGRAPHY.section_heading,
+            text_color=COLORS.TEXT_PRIMARY,
+        )
+        header.pack(anchor="w", padx=12, pady=(12, 4))
+
+        # Description
+        desc = ctk.CTkLabel(
+            self.restrictions_frame,
+            text="User can edit documents matching ANY selected category OR entity.",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_SECONDARY,
+            wraplength=420,
+        )
+        desc.pack(anchor="w", padx=12, pady=(0, 8))
+
+        # Two-column layout for categories and entities
+        cols_frame = ctk.CTkFrame(self.restrictions_frame, fg_color="transparent")
+        cols_frame.pack(fill="x", padx=12, pady=(0, 12))
+
+        # Categories column
+        cat_frame = ctk.CTkFrame(cols_frame, fg_color="transparent")
+        cat_frame.pack(side="left", fill="both", expand=True, padx=(0, 8))
+
+        cat_label = ctk.CTkLabel(
+            cat_frame,
+            text="Allowed Categories:",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_PRIMARY,
+        )
+        cat_label.pack(anchor="w", pady=(0, 4))
+
+        # Scrollable categories list
+        cat_scroll = ctk.CTkScrollableFrame(cat_frame, fg_color=COLORS.CARD, height=100)
+        cat_scroll.pack(fill="x")
+
+        categories = self.category_service.get_all_categories()
+        for cat in categories:
+            var = ctk.BooleanVar(value=False)
+            self._category_vars[cat.code] = var
+            cb = ctk.CTkCheckBox(
+                cat_scroll,
+                text=f"{cat.code} - {cat.name}",
+                variable=var,
+                font=TYPOGRAPHY.small,
+                text_color=COLORS.TEXT_PRIMARY,
+            )
+            cb.pack(anchor="w", pady=2)
+
+        # Entities column
+        ent_frame = ctk.CTkFrame(cols_frame, fg_color="transparent")
+        ent_frame.pack(side="left", fill="both", expand=True, padx=(8, 0))
+
+        ent_label = ctk.CTkLabel(
+            ent_frame,
+            text="Allowed Entities:",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_PRIMARY,
+        )
+        ent_label.pack(anchor="w", pady=(0, 4))
+
+        # Scrollable entities list
+        ent_scroll = ctk.CTkScrollableFrame(ent_frame, fg_color=COLORS.CARD, height=100)
+        ent_scroll.pack(fill="x")
+
+        entities = self.entity_service.get_all_entities()
+        if entities:
+            for entity in entities:
+                var = ctk.BooleanVar(value=False)
+                self._entity_vars[entity.name] = var
+                cb = ctk.CTkCheckBox(
+                    ent_scroll,
+                    text=entity.name,
+                    variable=var,
+                    font=TYPOGRAPHY.small,
+                    text_color=COLORS.TEXT_PRIMARY,
+                )
+                cb.pack(anchor="w", pady=2)
+        else:
+            no_ent = ctk.CTkLabel(
+                ent_scroll,
+                text="No entities defined yet",
+                font=TYPOGRAPHY.small,
+                text_color=COLORS.TEXT_MUTED,
+            )
+            no_ent.pack(anchor="w", pady=4)
+
+        # Load existing restrictions if editing
+        if self.is_edit_mode and self.user.role == UserRole.EDITOR_RESTRICTED.value:
+            self._load_restrictions()
+
+        # Initially hide if role is not EDITOR_RESTRICTED
+        self._on_role_changed(self.role_var.get())
+
+    def _on_role_changed(self, role_display: str) -> None:
+        """Handle role dropdown change."""
+        # Show/hide restrictions section based on role
+        if role_display == UserRole.EDITOR_RESTRICTED.display_name:
+            self.restrictions_frame.pack(anchor="w", fill="x", pady=(0, 12))
+        else:
+            self.restrictions_frame.pack_forget()
+
+    def _load_restrictions(self) -> None:
+        """Load existing restrictions for the user."""
+        if not self.user:
+            return
+
+        restrictions = self.user_service.get_user_restrictions(self.user.user_id)
+
+        # Set category checkboxes
+        for code in restrictions["categories"]:
+            if code in self._category_vars:
+                self._category_vars[code].set(True)
+
+        # Set entity checkboxes
+        for name in restrictions["entities"]:
+            if name in self._entity_vars:
+                self._entity_vars[name].set(True)
+
+    def _get_selected_categories(self) -> List[str]:
+        """Get list of selected category codes."""
+        return [code for code, var in self._category_vars.items() if var.get()]
+
+    def _get_selected_entities(self) -> List[str]:
+        """Get list of selected entity names."""
+        return [name for name, var in self._entity_vars.items() if var.get()]

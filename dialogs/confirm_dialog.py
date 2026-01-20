@@ -54,7 +54,12 @@ class ConfirmDialog(BaseDialog):
             cancel_text: Text for cancel button
             confirm_style: Style for confirm button (primary, danger)
         """
-        super().__init__(parent, title, width=400, height=180)
+        # Calculate height based on message length
+        # Base height: 120 for padding + buttons, ~20 per line of text
+        lines = len(message) // 45 + message.count('\n') + 1
+        calculated_height = max(200, 120 + (lines * 22))
+
+        super().__init__(parent, title, width=420, height=calculated_height)
 
         self._build_ui(message, confirm_text, cancel_text, confirm_style)
 
@@ -202,7 +207,12 @@ class InfoDialog(BaseDialog):
             message: Message to display
             button_text: Text for the button
         """
-        super().__init__(parent, title, width=400, height=160)
+        # Calculate height based on message length
+        # Base height: 100 for padding + button, ~20 per line of text
+        lines = len(message) // 45 + message.count('\n') + 1
+        calculated_height = max(180, 100 + (lines * 22))
+
+        super().__init__(parent, title, width=420, height=calculated_height)
 
         self._build_ui(message, button_text)
 

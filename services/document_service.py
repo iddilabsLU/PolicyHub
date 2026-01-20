@@ -14,6 +14,7 @@ from app.constants import (
     HistoryAction,
     ReviewFrequency,
     ReviewStatus,
+    UserRole,
 )
 from core.database import DatabaseManager
 from core.permissions import Permission, require_permission
@@ -42,6 +43,51 @@ class DocumentService:
         """
         self.db = db
         self.history_service = HistoryService(db)
+        # Lazy import to avoid circular dependency
+        self._user_service = None
+
+    def _get_user_service(self):
+        """Get the user service (lazy load to avoid circular import)."""
+        if self._user_service is None:
+            from services.user_service import UserService
+            self._user_service = UserService(self.db)
+        return self._user_service
+
+    def _check_restricted_editor_access(
+        self,
+        category: str,
+        applicable_entity: Optional[str],
+    ) -> None:
+        """
+        Check if a restricted editor has access to a document.
+
+        Raises PermissionError if the user is a restricted editor
+        and doesn't have access to the document's category or entities.
+
+        Args:
+            category: Document's category code
+            applicable_entity: Document's semicolon-separated entities (or None)
+
+        Raises:
+            PermissionError: If access is denied
+        """
+        session = SessionManager.get_instance()
+
+        # Only check for EDITOR_RESTRICTED role
+        if session.role != UserRole.EDITOR_RESTRICTED.value:
+            return
+
+        user_service = self._get_user_service()
+        has_access = user_service.check_document_access(
+            session.user_id,
+            category,
+            applicable_entity,
+        )
+
+        if not has_access:
+            raise PermissionError(
+                "Access denied: This document is outside your allowed categories and entities"
+            )
 
     # ============================================================
     # Query Methods
@@ -96,8 +142,12 @@ class DocumentService:
             params.append(1 if mandatory_read_all else 0)
 
         if applicable_entity:
-            query += " AND applicable_entity = ?"
-            params.append(applicable_entity)
+            # Use LIKE to match semicolon-separated entities
+            query += " AND (applicable_entity = ? OR applicable_entity LIKE ? OR applicable_entity LIKE ? OR applicable_entity LIKE ?)"
+            params.append(applicable_entity)  # Exact match
+            params.append(f"{applicable_entity};%")  # At start
+            params.append(f"%;{applicable_entity}")  # At end
+            params.append(f"%;{applicable_entity};%")  # In middle
 
         if search_term:
             query += " AND (title LIKE ? OR doc_ref LIKE ? OR description LIKE ?)"
@@ -311,8 +361,11 @@ class DocumentService:
 
         Raises:
             ValueError: If doc_ref already exists
-            PermissionError: If user lacks permission
+            PermissionError: If user lacks permission or restricted access
         """
+        # Check restricted editor access
+        self._check_restricted_editor_access(data.category, data.applicable_entity)
+
         # Validate doc_ref uniqueness
         if self.doc_ref_exists(data.doc_ref):
             raise ValueError(f"Document reference '{data.doc_ref}' already exists")
@@ -379,11 +432,16 @@ class DocumentService:
             Updated Document object or None if not found
 
         Raises:
-            PermissionError: If user lacks permission
+            PermissionError: If user lacks permission or restricted access
         """
         document = self.get_document_by_id(doc_id)
         if document is None:
             return None
+
+        # Check restricted editor access (use current or new category/entity)
+        check_category = data.category if data.category else document.category
+        check_entity = data.applicable_entity if data.applicable_entity is not None else document.applicable_entity
+        self._check_restricted_editor_access(check_category, check_entity)
 
         now = get_now()
         session = SessionManager.get_instance()
@@ -502,11 +560,14 @@ class DocumentService:
             Updated Document object or None if not found
 
         Raises:
-            PermissionError: If user lacks permission
+            PermissionError: If user lacks permission or restricted access
         """
         document = self.get_document_by_id(doc_id)
         if document is None:
             return None
+
+        # Check restricted editor access
+        self._check_restricted_editor_access(document.category, document.applicable_entity)
 
         today = get_today()
         now = get_now()
@@ -611,3 +672,164 @@ class DocumentService:
             Suggested reference code
         """
         return self.generate_next_ref(doc_type, category)
+
+    # ============================================================
+    # Sample Data Seeding
+    # ============================================================
+
+    def seed_sample_documents(self) -> int:
+        """
+        Seed sample documents for testing purposes.
+
+        Creates 5 dummy policies with various statuses and categories.
+        Only runs if no documents exist in the database.
+
+        Returns:
+            Number of documents created
+        """
+        # Check if documents already exist
+        if self.get_total_document_count() > 0:
+            logger.info("Documents already exist, skipping sample data seeding")
+            return 0
+
+        session = SessionManager.get_instance()
+        if not session.is_authenticated:
+            logger.warning("Cannot seed sample documents: no user logged in")
+            return 0
+
+        user_id = session.current_user.user_id
+        now = get_now()
+        today = get_today()
+
+        # Sample documents data
+        sample_documents = [
+            {
+                "doc_type": "POLICY",
+                "doc_ref": "POL-AML-001",
+                "title": "Anti-Money Laundering Policy",
+                "description": "This policy outlines the company's approach to preventing money laundering and terrorist financing activities.",
+                "category": "AML",
+                "owner": "Compliance Officer",
+                "approver": "Board of Directors",
+                "status": "ACTIVE",
+                "version": "2.1",
+                "effective_date": "2024-01-15",
+                "last_review_date": "2024-01-15",
+                "next_review_date": "2025-01-15",
+                "review_frequency": "ANNUAL",
+                "notes": "Updated to comply with latest CSSF regulations.",
+            },
+            {
+                "doc_type": "POLICY",
+                "doc_ref": "POL-GOV-001",
+                "title": "Corporate Governance Framework",
+                "description": "Establishes the governance structure and decision-making processes for the organization.",
+                "category": "GOV",
+                "owner": "CEO",
+                "approver": "Board of Directors",
+                "status": "ACTIVE",
+                "version": "1.0",
+                "effective_date": "2023-06-01",
+                "last_review_date": "2023-06-01",
+                "next_review_date": "2024-06-01",
+                "review_frequency": "ANNUAL",
+                "notes": "Initial version approved by the Board.",
+            },
+            {
+                "doc_type": "PROCEDURE",
+                "doc_ref": "PROC-IT-001",
+                "title": "Information Security Incident Response",
+                "description": "Step-by-step procedures for identifying, containing, and responding to security incidents.",
+                "category": "IT",
+                "owner": "IT Manager",
+                "approver": "CTO",
+                "status": "UNDER_REVIEW",
+                "version": "3.0",
+                "effective_date": "2023-03-20",
+                "last_review_date": "2023-03-20",
+                "next_review_date": "2024-03-20",
+                "review_frequency": "ANNUAL",
+                "notes": "Under review for alignment with ISO 27001.",
+            },
+            {
+                "doc_type": "POLICY",
+                "doc_ref": "POL-DP-001",
+                "title": "Data Protection & Privacy Policy",
+                "description": "Defines how personal data is collected, processed, stored, and protected in compliance with GDPR.",
+                "category": "DP",
+                "owner": "Data Protection Officer",
+                "approver": "Legal Counsel",
+                "status": "ACTIVE",
+                "version": "2.0",
+                "effective_date": "2024-05-25",
+                "last_review_date": "2024-05-25",
+                "next_review_date": "2024-11-25",
+                "review_frequency": "SEMI_ANNUAL",
+                "notes": "Updated with new data retention schedules.",
+            },
+            {
+                "doc_type": "MANUAL",
+                "doc_ref": "MAN-HR-001",
+                "title": "Employee Handbook",
+                "description": "Comprehensive guide covering employment policies, benefits, and workplace expectations.",
+                "category": "HR",
+                "owner": "HR Director",
+                "approver": "CEO",
+                "status": "DRAFT",
+                "version": "1.0",
+                "effective_date": "2025-01-01",
+                "last_review_date": "2024-12-01",
+                "next_review_date": "2026-01-01",
+                "review_frequency": "ANNUAL",
+                "notes": "Draft pending final review.",
+            },
+        ]
+
+        created_count = 0
+
+        for doc_data in sample_documents:
+            doc_id = generate_uuid()
+
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO documents (
+                        doc_id, doc_type, doc_ref, title, description, category,
+                        owner, approver, status, version, effective_date,
+                        last_review_date, next_review_date, review_frequency,
+                        notes, mandatory_read_all, applicable_entity,
+                        created_at, created_by, updated_at, updated_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        doc_id,
+                        doc_data["doc_type"],
+                        doc_data["doc_ref"],
+                        doc_data["title"],
+                        doc_data["description"],
+                        doc_data["category"],
+                        doc_data["owner"],
+                        doc_data["approver"],
+                        doc_data["status"],
+                        doc_data["version"],
+                        doc_data["effective_date"],
+                        doc_data["last_review_date"],
+                        doc_data["next_review_date"],
+                        doc_data["review_frequency"],
+                        doc_data["notes"],
+                        0,  # mandatory_read_all
+                        None,  # applicable_entity
+                        now,
+                        user_id,
+                        now,
+                        user_id,
+                    ),
+                )
+
+            # Log creation to history
+            self.history_service.log_document_created(doc_id)
+            created_count += 1
+            logger.info(f"Sample document created: {doc_data['doc_ref']}")
+
+        logger.info(f"Seeded {created_count} sample documents")
+        return created_count

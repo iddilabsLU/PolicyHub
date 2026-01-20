@@ -147,6 +147,15 @@ class LoginView(CenteredView):
         )
         self.remember_check.pack(anchor="w")
 
+        # Forgot password help text
+        forgot_label = ctk.CTkLabel(
+            form_frame,
+            text="Forgot password? Use the master password.",
+            font=TYPOGRAPHY.small,
+            text_color=COLORS.TEXT_MUTED,
+        )
+        forgot_label.pack(anchor="w", pady=(8, 0))
+
         # Status/error label
         self.status_label = ctk.CTkLabel(
             content,

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
     email TEXT UNIQUE,
-    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'EDITOR', 'VIEWER')),
+    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'EDITOR', 'EDITOR_RESTRICTED', 'VIEWER')),
     is_active INTEGER NOT NULL DEFAULT 1,
     force_password_change INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
@@ -151,6 +151,32 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+
+-- User restrictions table (for EDITOR_RESTRICTED role)
+CREATE TABLE IF NOT EXISTS user_restrictions (
+    restriction_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    restriction_type TEXT NOT NULL CHECK (restriction_type IN ('CATEGORY', 'ENTITY')),
+    value TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_restrictions_user ON user_restrictions(user_id);
+
+-- Backup history table
+CREATE TABLE IF NOT EXISTS backup_history (
+    backup_id TEXT PRIMARY KEY,
+    backup_path TEXT NOT NULL,
+    backup_type TEXT NOT NULL CHECK (backup_type IN ('MANUAL', 'SCHEDULED')),
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    size_bytes INTEGER,
+    notes TEXT,
+    FOREIGN KEY (created_by) REFERENCES users(user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_backup_history_date ON backup_history(created_at);
 """
 
 
@@ -330,6 +356,76 @@ class DatabaseManager:
         # Migration: Create email index if missing
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
+        # Migration: Create user_restrictions table if missing
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='user_restrictions'"
+        )
+        if cursor.fetchone() is None:
+            logger.info("Migration: Creating user_restrictions table")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_restrictions (
+                    restriction_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    restriction_type TEXT NOT NULL CHECK (restriction_type IN ('CATEGORY', 'ENTITY')),
+                    value TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_restrictions_user ON user_restrictions(user_id)")
+
+        # Migration: Create backup_history table if missing
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='backup_history'"
+        )
+        if cursor.fetchone() is None:
+            logger.info("Migration: Creating backup_history table")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS backup_history (
+                    backup_id TEXT PRIMARY KEY,
+                    backup_path TEXT NOT NULL,
+                    backup_type TEXT NOT NULL CHECK (backup_type IN ('MANUAL', 'SCHEDULED')),
+                    created_at TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    size_bytes INTEGER,
+                    notes TEXT,
+                    FOREIGN KEY (created_by) REFERENCES users(user_id)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_backup_history_date ON backup_history(created_at)")
+
+        # Migration: Add master_password_hash setting if missing
+        cursor = conn.execute(
+            "SELECT value FROM settings WHERE key = 'master_password_hash'"
+        )
+        if cursor.fetchone() is None:
+            from app.constants import DEFAULT_MASTER_PASSWORD
+            from services.auth_service import AuthService
+
+            logger.info("Migration: Adding master_password_hash setting")
+            hashed = AuthService.hash_password(DEFAULT_MASTER_PASSWORD)
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?)",
+                ("master_password_hash", hashed),
+            )
+
+        # Migration: Add require_login setting if missing
+        cursor = conn.execute(
+            "SELECT value FROM settings WHERE key = 'require_login'"
+        )
+        if cursor.fetchone() is None:
+            # Default to "true" for existing databases with users (backward compatibility)
+            # Default to "false" for new databases (handled in _seed_settings)
+            cursor = conn.execute("SELECT COUNT(*) FROM users")
+            has_users = cursor.fetchone()[0] > 0
+            require_login_value = "true" if has_users else "false"
+
+            logger.info(f"Migration: Adding require_login setting (value={require_login_value})")
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?)",
+                ("require_login", require_login_value),
+            )
+
     def _seed_categories(self, conn: sqlite3.Connection) -> None:
         """
         Insert default categories if they don't exist.
@@ -355,22 +451,26 @@ class DatabaseManager:
         """
         Insert default settings if they don't exist.
 
+        Uses INSERT OR IGNORE to only add settings that are missing.
+
         Args:
             conn: Database connection
         """
-        cursor = conn.execute("SELECT COUNT(*) FROM settings")
-        count = cursor.fetchone()[0]
+        from app.constants import DEFAULT_MASTER_PASSWORD
+        from services.auth_service import AuthService
 
-        if count == 0:
-            logger.info("Seeding default settings")
-            for key, value in DEFAULT_SETTINGS.items():
-                conn.execute(
-                    """
-                    INSERT INTO settings (key, value)
-                    VALUES (?, ?)
-                    """,
-                    (key, value),
-                )
+        logger.info("Seeding default settings (if not exists)")
+        for key, value in DEFAULT_SETTINGS.items():
+            # Hash the default master password
+            if key == "master_password_hash":
+                value = AuthService.hash_password(DEFAULT_MASTER_PASSWORD)
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO settings (key, value)
+                VALUES (?, ?)
+                """,
+                (key, value),
+            )
 
     def execute(
         self,

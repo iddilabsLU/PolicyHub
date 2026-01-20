@@ -98,19 +98,27 @@ class UserRole(str, Enum):
 
     ADMIN = "ADMIN"
     EDITOR = "EDITOR"
+    EDITOR_RESTRICTED = "EDITOR_RESTRICTED"
     VIEWER = "VIEWER"
 
     @property
     def display_name(self) -> str:
         """Human-readable name."""
-        return self.value.title()
+        names = {
+            "ADMIN": "Admin",
+            "EDITOR": "Editor",
+            "EDITOR_RESTRICTED": "Editor (Restricted)",
+            "VIEWER": "Viewer",
+        }
+        return names[self.value]
 
     @property
     def description(self) -> str:
         """Role description for UI."""
         descriptions = {
             "ADMIN": "Full access + user management",
-            "EDITOR": "Add/edit documents",
+            "EDITOR": "Add/edit all documents",
+            "EDITOR_RESTRICTED": "Add/edit documents in allowed categories/entities",
             "VIEWER": "Read only",
         }
         return descriptions[self.value]
@@ -184,7 +192,12 @@ DEFAULT_SETTINGS: Dict[str, str] = {
     "upcoming_threshold_days": "90",
     "date_format": "DD/MM/YYYY",
     "default_review_frequency": "ANNUAL",
+    "require_login": "false",  # Whether login is required (default: not required)
+    "master_password_hash": "",  # Will be set on DB creation with hashed default
 }
+
+# Master password (safety net for forgotten admin passwords)
+DEFAULT_MASTER_PASSWORD: str = "masterpass123"
 
 # File upload constraints
 MAX_FILE_SIZE_MB: int = 25

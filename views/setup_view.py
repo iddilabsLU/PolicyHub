@@ -40,6 +40,7 @@ class SetupView(CenteredView):
         app: "PolicyHubApp",
         on_complete: Callable[[], None],
         error_message: Optional[str] = None,
+        create_new: bool = False,
     ):
         """
         Initialize the setup view.
@@ -49,10 +50,12 @@ class SetupView(CenteredView):
             app: Main application instance
             on_complete: Callback when setup is complete
             error_message: Optional error message to display
+            create_new: True if creating a new database (affects default settings)
         """
         super().__init__(parent, app, max_width=500)
         self.on_complete = on_complete
         self.config_manager = ConfigManager.get_instance()
+        self.create_new = create_new
 
         self._build_ui(error_message)
 

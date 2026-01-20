@@ -187,3 +187,69 @@ class EntityService:
             logger.info(f"Deleted entity: {entity_id}")
 
         return deleted
+
+    # ============================================================
+    # Multi-Entity Helpers
+    # ============================================================
+
+    @staticmethod
+    def parse_entities(entity_string: Optional[str]) -> List[str]:
+        """
+        Parse a semicolon-separated entity string into a list.
+
+        Args:
+            entity_string: Semicolon-separated entity names (e.g., "Entity A;Entity B")
+
+        Returns:
+            List of entity names (empty list if input is None or empty)
+        """
+        if not entity_string:
+            return []
+        return [e.strip() for e in entity_string.split(";") if e.strip()]
+
+    @staticmethod
+    def format_entities(entities: List[str]) -> str:
+        """
+        Format a list of entity names into a semicolon-separated string.
+
+        Args:
+            entities: List of entity names
+
+        Returns:
+            Semicolon-separated string (empty string if list is empty)
+        """
+        if not entities:
+            return ""
+        return ";".join(e.strip() for e in entities if e.strip())
+
+    def ensure_entities_exist(self, entity_string: Optional[str]) -> None:
+        """
+        Ensure all entities in a semicolon-separated string exist in the database.
+
+        Creates any entities that don't exist.
+
+        Args:
+            entity_string: Semicolon-separated entity names
+        """
+        if not entity_string:
+            return
+
+        entities = self.parse_entities(entity_string)
+        for entity_name in entities:
+            self.get_or_create_entity(entity_name)
+
+    def get_or_create_multiple(self, entity_names: List[str]) -> List[Entity]:
+        """
+        Get or create multiple entities at once.
+
+        Args:
+            entity_names: List of entity names
+
+        Returns:
+            List of Entity objects
+        """
+        entities = []
+        for name in entity_names:
+            if name.strip():
+                entities.append(self.get_or_create_entity(name.strip()))
+        return entities

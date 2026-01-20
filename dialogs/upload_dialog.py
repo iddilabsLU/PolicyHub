@@ -45,18 +45,47 @@ class UploadDialog(BaseDialog):
         self.current_version = current_version
         self.selected_file: Optional[Path] = None
 
-        super().__init__(parent, "Upload Attachment", width=500, height=350)
+        super().__init__(parent, "Upload Attachment", width=500, height=380)
         self._build_ui()
 
     def _build_ui(self) -> None:
         """Build the dialog UI."""
-        # Main container
+        # Main container with padding
         main_frame = ctk.CTkFrame(self, fg_color="transparent")
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # IMPORTANT: Pack buttons FIRST at bottom to guarantee visibility
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(side="bottom", fill="x", pady=(15, 0))
+
+        self.upload_btn = ctk.CTkButton(
+            button_frame,
+            text="Upload",
+            command=self._on_upload,
+            width=100,
+            height=36,
+            state="disabled",
+        )
+        configure_button_style(self.upload_btn, "primary")
+        self.upload_btn.pack(side="right", padx=(5, 0))
+
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self._on_cancel,
+            width=100,
+            height=36,
+        )
+        configure_button_style(cancel_btn, "secondary")
+        cancel_btn.pack(side="right")
+
+        # Content area (fills remaining space above buttons)
+        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        content_frame.pack(side="top", fill="both", expand=True)
+
         # Title
         title_label = ctk.CTkLabel(
-            main_frame,
+            content_frame,
             text=f"Upload attachment for {self.doc_ref}",
             font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_PRIMARY,
@@ -65,10 +94,10 @@ class UploadDialog(BaseDialog):
 
         # File selection area
         file_frame = ctk.CTkFrame(
-            main_frame,
+            content_frame,
             fg_color=COLORS.MUTED,
             corner_radius=SPACING.CORNER_RADIUS,
-            height=100,
+            height=80,
         )
         file_frame.pack(fill="x", pady=(0, 15))
         file_frame.pack_propagate(False)
@@ -84,18 +113,18 @@ class UploadDialog(BaseDialog):
 
         # Browse button
         browse_btn = ctk.CTkButton(
-            main_frame,
+            content_frame,
             text="Browse Files...",
             command=self._browse_file,
             width=150,
             height=36,
         )
         configure_button_style(browse_btn, "secondary")
-        browse_btn.pack(pady=(0, 20))
+        browse_btn.pack(pady=(0, 15))
 
         # Version label input
-        version_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        version_frame.pack(fill="x", pady=(0, 15))
+        version_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        version_frame.pack(fill="x", pady=(0, 10))
 
         version_label = ctk.CTkLabel(
             version_frame,
@@ -119,38 +148,13 @@ class UploadDialog(BaseDialog):
         # Help text
         help_text = f"Allowed: {', '.join(ALLOWED_EXTENSIONS)}\nMax size: {MAX_FILE_SIZE_MB} MB"
         help_label = ctk.CTkLabel(
-            main_frame,
+            content_frame,
             text=help_text,
             font=TYPOGRAPHY.small,
             text_color=COLORS.TEXT_MUTED,
             justify="left",
         )
-        help_label.pack(anchor="w", pady=(0, 20))
-
-        # Buttons
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(fill="x", side="bottom")
-
-        cancel_btn = ctk.CTkButton(
-            button_frame,
-            text="Cancel",
-            command=self._on_cancel,
-            width=100,
-            height=36,
-        )
-        configure_button_style(cancel_btn, "secondary")
-        cancel_btn.pack(side="right", padx=5)
-
-        self.upload_btn = ctk.CTkButton(
-            button_frame,
-            text="Upload",
-            command=self._on_upload,
-            width=100,
-            height=36,
-            state="disabled",
-        )
-        configure_button_style(self.upload_btn, "primary")
-        self.upload_btn.pack(side="right", padx=5)
+        help_label.pack(anchor="w")
 
     def _browse_file(self) -> None:
         """Open file browser to select a file."""

@@ -78,6 +78,20 @@ ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
         Permission.MARK_REVIEWED,
         Permission.MANAGE_LINKS,
     },
+    UserRole.EDITOR_RESTRICTED.value: {
+        # Same as Editor - restrictions enforced at document level
+        Permission.VIEW_REGISTER,
+        Permission.VIEW_DOCUMENT,
+        Permission.DOWNLOAD_ATTACHMENT,
+        Permission.EXPORT_REGISTER,
+        Permission.GENERATE_REPORTS,
+        Permission.ADD_DOCUMENT,
+        Permission.EDIT_DOCUMENT,
+        Permission.UPLOAD_ATTACHMENT,
+        Permission.DELETE_ATTACHMENT,
+        Permission.MARK_REVIEWED,
+        Permission.MANAGE_LINKS,
+    },
     UserRole.VIEWER.value: {
         # View-only permissions
         Permission.VIEW_REGISTER,
@@ -256,10 +270,16 @@ class PermissionChecker:
         return self._session.is_admin() if self.is_authenticated else False
 
     def is_editor(self) -> bool:
-        """Check if user is an editor."""
+        """Check if user is an editor (full or restricted)."""
         if not self.is_authenticated:
             return False
-        return self.role == UserRole.EDITOR.value
+        return self.role in (UserRole.EDITOR.value, UserRole.EDITOR_RESTRICTED.value)
+
+    def is_editor_restricted(self) -> bool:
+        """Check if user is a restricted editor."""
+        if not self.is_authenticated:
+            return False
+        return self.role == UserRole.EDITOR_RESTRICTED.value
 
     def is_viewer(self) -> bool:
         """Check if user is a viewer."""

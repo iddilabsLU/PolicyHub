@@ -8,7 +8,7 @@ import logging
 from typing import List
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, LETTER
+from reportlab.lib.pagesizes import A4, LETTER, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch, mm
 from reportlab.platypus import (
@@ -110,16 +110,21 @@ class PDFGenerator(BaseReportGenerator):
         Returns:
             Path to the generated file
         """
-        # Determine page size
-        page_size = LETTER if self.data.config.page_size == "LETTER" else A4
+        # Determine page size - always use landscape for better table display
+        base_size = LETTER if self.data.config.page_size == "LETTER" else A4
+        page_size = landscape(base_size)
+
+        # Store page dimensions for width calculations
+        self.page_width = page_size[0]
+        self.page_height = page_size[1]
 
         doc = SimpleDocTemplate(
             output_path,
             pagesize=page_size,
-            leftMargin=20 * mm,
-            rightMargin=20 * mm,
-            topMargin=20 * mm,
-            bottomMargin=20 * mm,
+            leftMargin=15 * mm,
+            rightMargin=15 * mm,
+            topMargin=15 * mm,
+            bottomMargin=15 * mm,
         )
 
         # Build content
@@ -186,7 +191,9 @@ class PDFGenerator(BaseReportGenerator):
         if labels:
             summary_data = [labels, values]
             col_count = len(labels)
-            col_width = (170 * mm - 40 * mm) / col_count  # Available width divided by columns
+            # Use stored page width for landscape, fallback to A4 landscape width
+            available_width = getattr(self, 'page_width', 297 * mm) - 30 * mm
+            col_width = available_width / col_count
 
             table = Table(
                 summary_data,
@@ -232,8 +239,8 @@ class PDFGenerator(BaseReportGenerator):
                     row_data.append(formatted)
             table_data.append(row_data)
 
-        # Calculate column widths
-        available_width = 170 * mm  # A4 width minus margins
+        # Calculate column widths - use landscape page width
+        available_width = getattr(self, 'page_width', 297 * mm) - 30 * mm  # Page width minus margins
         total_defined_width = sum(col.width for col in self.data.columns)
         scale = available_width / total_defined_width if total_defined_width > 0 else 1
 

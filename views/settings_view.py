@@ -78,6 +78,7 @@ class SettingsView(BaseView):
             ("general", "General"),
             ("users", "Users"),
             ("categories", "Categories"),
+            ("backup", "Backup & Restore"),
         ]
 
         for tab_id, tab_label in tab_config:
@@ -180,6 +181,10 @@ class SettingsView(BaseView):
             elif tab_id == "categories":
                 from views.settings.categories_settings import CategoriesSettingsView
                 self._tabs[tab_id] = CategoriesSettingsView(self._content_frame, self.app)
+
+            elif tab_id == "backup":
+                from views.settings.backup_settings import BackupSettingsView
+                self._tabs[tab_id] = BackupSettingsView(self._content_frame, self.app)
 
         except Exception as e:
             # Create error view

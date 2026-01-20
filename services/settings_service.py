@@ -29,6 +29,8 @@ class SettingsService:
     UPCOMING_THRESHOLD = "upcoming_threshold_days"
     DATE_FORMAT = "date_format"
     DEFAULT_REVIEW_FREQUENCY = "default_review_frequency"
+    REQUIRE_LOGIN = "require_login"
+    MASTER_PASSWORD_HASH = "master_password_hash"
 
     # Default values
     DEFAULTS = {
@@ -214,3 +216,75 @@ class SettingsService:
             Review frequency code (default: ANNUAL)
         """
         return self.get_setting(self.DEFAULT_REVIEW_FREQUENCY) or "ANNUAL"
+
+    # Authentication settings
+
+    def get_require_login(self) -> bool:
+        """
+        Get whether login is required to use the application.
+
+        Returns:
+            True if login is required, False otherwise (default: False for new DBs)
+        """
+        value = self.get_setting(self.REQUIRE_LOGIN)
+        return value.lower() == "true" if value else False
+
+    @require_permission(Permission.CHANGE_SETTINGS)
+    def set_require_login(self, require: bool) -> None:
+        """
+        Set whether login is required to use the application.
+
+        Args:
+            require: True to require login, False to allow auto-login
+
+        Raises:
+            PermissionError: If user lacks CHANGE_SETTINGS permission
+        """
+        self.set_setting(self.REQUIRE_LOGIN, "true" if require else "false")
+        logger.info(f"Require login setting changed to: {require}")
+
+    def set_require_login_direct(self, require: bool) -> None:
+        """
+        Set require_login without permission check.
+
+        Used during initial setup when no user is logged in yet.
+
+        Args:
+            require: True to require login, False to allow auto-login
+        """
+        self._insert_setting(self.REQUIRE_LOGIN, "true" if require else "false")
+        logger.info(f"Require login setting set to: {require} (direct)")
+
+    def get_master_password_hash(self) -> Optional[str]:
+        """
+        Get the master password hash.
+
+        Returns:
+            bcrypt hash of the master password, or None if not set
+        """
+        return self.get_setting(self.MASTER_PASSWORD_HASH)
+
+    @require_permission(Permission.MANAGE_USERS)
+    def set_master_password(self, new_password: str) -> None:
+        """
+        Set a new master password.
+
+        Args:
+            new_password: The new master password (will be hashed)
+
+        Raises:
+            PermissionError: If user lacks MANAGE_USERS permission
+            ValueError: If password doesn't meet requirements
+        """
+        from services.auth_service import AuthService
+        from utils.validators import validate_password
+
+        # Validate password strength
+        is_valid, error = validate_password(new_password)
+        if not is_valid:
+            raise ValueError(error)
+
+        # Hash and store
+        hashed = AuthService.hash_password(new_password)
+        self.set_setting(self.MASTER_PASSWORD_HASH, hashed)
+        logger.info("Master password changed")
