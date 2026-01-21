@@ -91,9 +91,9 @@ class AuthService:
         Returns:
             User object if authentication succeeds, None otherwise
         """
-        # Fetch user by username
+        # Fetch user by username (case-insensitive)
         row = self.db.fetch_one(
-            "SELECT * FROM users WHERE username = ? AND is_active = 1",
+            "SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND is_active = 1",
             (username,),
         )
 

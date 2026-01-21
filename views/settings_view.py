@@ -79,6 +79,7 @@ class SettingsView(BaseView):
             ("users", "Users"),
             ("categories", "Categories"),
             ("backup", "Backup & Restore"),
+            ("database", "Database"),
         ]
 
         for tab_id, tab_label in tab_config:
@@ -185,6 +186,10 @@ class SettingsView(BaseView):
             elif tab_id == "backup":
                 from views.settings.backup_settings import BackupSettingsView
                 self._tabs[tab_id] = BackupSettingsView(self._content_frame, self.app)
+
+            elif tab_id == "database":
+                from views.settings.database_settings import DatabaseSettingsView
+                self._tabs[tab_id] = DatabaseSettingsView(self._content_frame, self.app)
 
         except Exception as e:
             # Create error view

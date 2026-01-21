@@ -78,9 +78,10 @@ class SetupView(CenteredView):
         )
         title_label.pack(pady=(0, 5))
 
+        subtitle_text = "Create New Database" if self.create_new else "Connect to Database"
         subtitle_label = ctk.CTkLabel(
             header_frame,
-            text="Setup",
+            text=subtitle_text,
             font=TYPOGRAPHY.section_heading,
             text_color=COLORS.TEXT_SECONDARY,
         )
@@ -90,16 +91,31 @@ class SetupView(CenteredView):
         divider = ctk.CTkFrame(content, fg_color=COLORS.BORDER, height=1)
         divider.pack(fill="x", padx=SPACING.CARD_PADDING, pady=SPACING.SECTION_SPACING)
 
-        # Welcome message
+        # Welcome message - different text based on context
         welcome_frame = ctk.CTkFrame(content, fg_color="transparent")
         welcome_frame.pack(fill="x", padx=SPACING.CARD_PADDING)
 
+        if self.create_new:
+            welcome_text = (
+                "Let's create a new PolicyHub database.\n\n"
+                "Choose a folder where the database will be stored. This can be:\n"
+                "• A network folder (e.g., \\\\server\\PolicyHub) for team access\n"
+                "• A local folder (e.g., C:\\PolicyHub) for personal use"
+            )
+        else:
+            welcome_text = (
+                "Let's connect PolicyHub to an existing database.\n\n"
+                "Select the folder where your PolicyHub database is located. "
+                "If you're unsure, ask your administrator for the correct path."
+            )
+
         welcome_label = ctk.CTkLabel(
             welcome_frame,
-            text="Welcome! Let's connect PolicyHub to your shared folder.",
+            text=welcome_text,
             font=TYPOGRAPHY.body,
             text_color=COLORS.TEXT_PRIMARY,
             wraplength=450,
+            justify="left",
         )
         welcome_label.pack(anchor="w")
 
@@ -125,9 +141,10 @@ class SetupView(CenteredView):
         path_frame = ctk.CTkFrame(content, fg_color="transparent")
         path_frame.pack(fill="x", padx=SPACING.CARD_PADDING, pady=SPACING.SECTION_SPACING)
 
+        path_label_text = "Database Folder:" if self.create_new else "Database Location:"
         path_label = ctk.CTkLabel(
             path_frame,
-            text="Shared Folder Path:",
+            text=path_label_text,
             font=TYPOGRAPHY.body,
             text_color=COLORS.TEXT_PRIMARY,
         )
@@ -155,10 +172,21 @@ class SetupView(CenteredView):
         configure_button_style(self.browse_button, "secondary")
         self.browse_button.grid(row=0, column=1)
 
-        # Help text
+        # Help text - different based on context
+        if self.create_new:
+            help_text = (
+                "The folder must already exist and you must have write permission.\n"
+                "PolicyHub will create subfolders for data, attachments, and exports."
+            )
+        else:
+            help_text = (
+                "Select the main PolicyHub folder that contains the 'data' subfolder.\n"
+                "Ask your administrator if you don't know the path."
+            )
+
         help_label = ctk.CTkLabel(
             path_frame,
-            text="This should be a network folder accessible to all users.\nAsk your administrator if you don't know the path.",
+            text=help_text,
             font=TYPOGRAPHY.small,
             text_color=COLORS.TEXT_SECONDARY,
             justify="left",
@@ -182,9 +210,10 @@ class SetupView(CenteredView):
         button_frame = ctk.CTkFrame(content, fg_color="transparent")
         button_frame.pack(fill="x", padx=SPACING.CARD_PADDING, pady=(0, SPACING.CARD_PADDING))
 
+        button_text = "Create" if self.create_new else "Connect"
         self.connect_button = ctk.CTkButton(
             button_frame,
-            text="Connect",
+            text=button_text,
             command=self._on_connect,
             width=120,
         )

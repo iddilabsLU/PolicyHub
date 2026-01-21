@@ -43,14 +43,48 @@ class DatabaseSelectionDialog(BaseDialog):
         Args:
             parent: Parent window
         """
+        self._parent = parent
         super().__init__(
             parent,
             "Welcome to PolicyHub",
-            width=500,
-            height=400,
+            width=520,
+            height=100,  # Initial height, will auto-adjust
             resizable=False,
         )
         self._build_ui()
+        self._auto_resize()
+
+    def _auto_resize(self) -> None:
+        """Auto-resize dialog to fit content."""
+        self.update_idletasks()
+
+        # Get required height based on content
+        req_height = self.winfo_reqheight()
+        req_width = 520  # Keep width fixed
+
+        # Add some padding
+        final_height = max(req_height + 20, 400)
+
+        # Cap at screen size
+        screen_height = self.winfo_screenheight()
+        final_height = min(final_height, int(screen_height * 0.85))
+
+        # Re-center on parent
+        self._parent.update_idletasks()
+        px = self._parent.winfo_rootx()
+        py = self._parent.winfo_rooty()
+        pw = self._parent.winfo_width()
+        ph = self._parent.winfo_height()
+
+        x = px + (pw - req_width) // 2
+        y = py + (ph - final_height) // 2
+
+        # Ensure on screen
+        screen_width = self._parent.winfo_screenwidth()
+        x = max(0, min(x, screen_width - req_width))
+        y = max(0, min(y, screen_height - final_height))
+
+        self.geometry(f"{req_width}x{final_height}+{x}+{y}")
 
     def _build_ui(self) -> None:
         """Build the dialog UI."""
@@ -62,7 +96,7 @@ class DatabaseSelectionDialog(BaseDialog):
         header = ctk.CTkLabel(
             container,
             text="Welcome to PolicyHub",
-            font=TYPOGRAPHY.page_title,
+            font=TYPOGRAPHY.window_title,
             text_color=COLORS.TEXT_PRIMARY,
         )
         header.pack(pady=(0, 8))
@@ -70,9 +104,10 @@ class DatabaseSelectionDialog(BaseDialog):
         # Subtitle
         subtitle = ctk.CTkLabel(
             container,
-            text="How would you like to get started?",
+            text="PolicyHub stores documents in a shared database.\nChoose how you want to proceed:",
             font=TYPOGRAPHY.body,
             text_color=COLORS.TEXT_SECONDARY,
+            justify="center",
         )
         subtitle.pack(pady=(0, 24))
 
@@ -84,7 +119,11 @@ class DatabaseSelectionDialog(BaseDialog):
         self._create_option_card(
             cards_frame,
             title="Create New Database",
-            description="Start fresh with a new PolicyHub database. You'll set up the storage location and create an admin account.",
+            description=(
+                "Start fresh with a new database. Choose this if you're setting up PolicyHub "
+                "for the first time in your organization, or if you want to create a separate "
+                "database for personal use."
+            ),
             button_text="Create New",
             command=self._on_create_new,
             icon_text="+"
@@ -93,8 +132,12 @@ class DatabaseSelectionDialog(BaseDialog):
         # Connect to Existing card
         self._create_option_card(
             cards_frame,
-            title="Connect to Existing",
-            description="Connect to an existing PolicyHub database folder. Choose this if you've already set up PolicyHub before.",
+            title="Connect to Existing Database",
+            description=(
+                "Connect to a database that has already been set up. Choose this if your team "
+                "already has a PolicyHub database on a shared network folder, or if you want to "
+                "connect to a backup you've restored."
+            ),
             button_text="Browse...",
             command=self._on_connect_existing,
             icon_text="..."
@@ -188,14 +231,19 @@ class DatabaseSelectionDialog(BaseDialog):
             return
 
         # Verify the folder contains a PolicyHub database
-        db_path = Path(folder_path) / DATABASE_FILENAME
-        if not db_path.exists():
+        # Check both in data/ subfolder and directly in folder (for compatibility)
+        db_path = Path(folder_path) / "data" / DATABASE_FILENAME
+        db_path_alt = Path(folder_path) / DATABASE_FILENAME
+
+        if not db_path.exists() and not db_path_alt.exists():
             from dialogs.confirm_dialog import InfoDialog
             InfoDialog.show_error(
                 self,
-                "Invalid Folder",
+                "No Database Found",
                 f"The selected folder does not contain a PolicyHub database.\n\n"
-                f"Expected to find: {DATABASE_FILENAME}"
+                f"Make sure you select the main PolicyHub folder that contains "
+                f"the 'data' subfolder with the database file.\n\n"
+                f"If you want to create a new database, click 'Create New' instead."
             )
             return
 
