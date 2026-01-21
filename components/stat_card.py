@@ -49,7 +49,7 @@ class StatCard(ctk.CTkFrame):
             parent: Parent widget
             value: The main value to display (e.g., "42")
             label: Description label (e.g., "Active Documents")
-            accent_color: Color for the left accent bar (defaults to primary)
+            accent_color: Color for the top accent border (defaults to primary)
             on_click: Optional callback when card is clicked
             **kwargs: Additional frame options
         """
@@ -61,10 +61,11 @@ class StatCard(ctk.CTkFrame):
             corner_radius=SPACING.CORNER_RADIUS_LARGE,
             border_width=1,
             border_color=shadow_border,
-            height=90,  # Ensure consistent card height
+            height=60,  # Much more compact card height
             **kwargs
         )
         self._default_border = shadow_border
+        self.pack_propagate(False)  # Enforce the height
 
         self._on_click = on_click
         self._accent_color = accent_color or COLORS.PRIMARY
@@ -77,41 +78,37 @@ class StatCard(ctk.CTkFrame):
             self._make_clickable()
 
     def _build_ui(self, value: str, label: str) -> None:
-        """Build the card UI."""
-        # Main container with horizontal layout
-        container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=0, pady=0)
-
-        # Left accent bar
+        """Build the card UI with top accent border."""
+        # Top accent border
         self.accent = ctk.CTkFrame(
-            container,
+            self,
             fg_color=self._accent_color,
-            width=4,
-            corner_radius=2,
+            height=3,
+            corner_radius=0,
         )
-        self.accent.pack(side="left", fill="y", padx=(12, 0), pady=12)
+        self.accent.pack(fill="x", side="top")
 
-        # Content frame
-        content = ctk.CTkFrame(container, fg_color="transparent")
-        content.pack(side="left", fill="both", expand=True, padx=16, pady=12)
+        # Content container - horizontal layout with number and label side by side
+        content = ctk.CTkFrame(self, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=SPACING.CARD_PADDING, pady=SPACING.CARD_PADDING - 4)
 
-        # Value (large number)
+        # Value (number) on the left
         self.value_label = ctk.CTkLabel(
             content,
             text=value,
-            font=TYPOGRAPHY.get_font(28, "bold"),
+            font=TYPOGRAPHY.get_font(22, "bold"),
             text_color=COLORS.TEXT_PRIMARY,
         )
-        self.value_label.pack(anchor="w")
+        self.value_label.pack(side="left")
 
-        # Label
+        # Label on the right with some spacing
         self.label_widget = ctk.CTkLabel(
             content,
             text=label,
             font=TYPOGRAPHY.body,
             text_color=COLORS.TEXT_SECONDARY,
         )
-        self.label_widget.pack(anchor="w")
+        self.label_widget.pack(side="left", padx=(10, 0))
 
     def _make_clickable(self) -> None:
         """Make the card respond to clicks."""

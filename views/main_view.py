@@ -135,6 +135,12 @@ class MainView(BaseView):
             )
             self.settings_btn.pack(fill="x", pady=4)
 
+        # IddiLabs button
+        self.iddilabs_btn = self._create_nav_button(
+            nav_frame, "  IddiLabs", "iddilabs"
+        )
+        self.iddilabs_btn.pack(fill="x", pady=4)
+
         # User info and logout at bottom
         user_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         user_frame.pack(side="bottom", fill="x", padx=15, pady=20)
@@ -215,6 +221,7 @@ class MainView(BaseView):
             "dashboard": self.dashboard_btn,
             "register": self.register_btn,
             "reports": self.reports_btn,
+            "iddilabs": self.iddilabs_btn,
         }
 
         if hasattr(self, "settings_btn"):
@@ -294,6 +301,12 @@ class MainView(BaseView):
                 logger.info("Creating SettingsView...")
                 self.content_views[view_name] = SettingsView(self.content, self.app)
                 logger.info("SettingsView created successfully")
+
+            elif view_name == "iddilabs":
+                from views.iddilabs_view import IddiLabsView
+                logger.info("Creating IddiLabsView...")
+                self.content_views[view_name] = IddiLabsView(self.content, self.app)
+                logger.info("IddiLabsView created successfully")
 
             elif view_name == "document_detail":
                 # Document detail view is created dynamically with a document

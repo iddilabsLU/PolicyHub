@@ -266,14 +266,15 @@ class RegisterView(BaseView):
             return
 
         try:
+            # Force layout update to get accurate dimensions
+            self.table_container.update_idletasks()
+
             # Get available width (container width minus padding and scrollbar)
             available_width = self.table_container.winfo_width() - (SPACING.CARD_PADDING * 2) - 20
 
-            if available_width < 400:  # Not yet rendered or too small
-                # Use fallback widths
-                fallback_widths = [110, 280, 90, 100, 130, 100, 90, 100]
-                for i, width in enumerate(fallback_widths):
-                    self.table.column_width(i, width)
+            if available_width < 400:
+                # Not yet rendered, schedule another resize attempt
+                self.after(50, self._resize_columns)
                 return
 
             # Calculate total weight
@@ -284,6 +285,9 @@ class RegisterView(BaseView):
                 proportional_width = int((weight / total_weight) * available_width)
                 final_width = max(proportional_width, min_width)
                 self.table.column_width(i, final_width)
+
+            # Force table to redraw with new column widths
+            self.table.refresh()
 
         except Exception:
             pass  # Ignore errors during resize
@@ -504,4 +508,7 @@ class RegisterView(BaseView):
         super().on_show()
         self._refresh_table()
         # Force resize after view is fully rendered to ensure columns fill space
+        # Multiple calls with increasing delays to handle different rendering timings
         self.after(50, self._resize_columns)
+        self.after(150, self._resize_columns)
+        self.after(300, self._resize_columns)
