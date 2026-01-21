@@ -67,7 +67,7 @@ echo Building PolicyHub executable...
 echo This may take a few minutes...
 echo.
 
-pyinstaller PolicyHub.spec --noconfirm
+pyinstaller PolicyHub.spec --noconfirm --distpath build
 
 if errorlevel 1 (
     echo.
@@ -79,14 +79,14 @@ if errorlevel 1 (
 )
 
 REM Check if build succeeded
-if not exist "dist\PolicyHub.exe" (
+if not exist "build\PolicyHub.exe" (
     echo.
     echo ERROR: Build completed but executable not found.
     exit /b 1
 )
 
 REM Get file size
-for %%A in ("dist\PolicyHub.exe") do set size=%%~zA
+for %%A in ("build\PolicyHub.exe") do set size=%%~zA
 set /a size_mb=%size% / 1048576
 
 echo.
@@ -94,11 +94,11 @@ echo ============================================
 echo BUILD SUCCESSFUL
 echo ============================================
 echo.
-echo Executable: dist\PolicyHub.exe
+echo Executable: build\PolicyHub.exe
 echo Size: ~%size_mb% MB
 echo.
 echo To distribute:
-echo   1. Copy dist\PolicyHub.exe to target machine
+echo   1. Copy build\PolicyHub.exe to target machine
 echo   2. Run PolicyHub.exe
 echo   3. The app will create its data folder in %%LOCALAPPDATA%%\PolicyHub
 echo.
