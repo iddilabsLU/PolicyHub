@@ -2,119 +2,92 @@
 
 **Policy & Procedure Lifecycle Manager**
 
-A native Windows desktop application for managing policies and procedures in regulated financial entities. Designed for Luxembourg PSFs, fund administrators, and compliance teams.
+A native Windows desktop application for managing policies and procedures in regulated entities. Built with Python and CustomTkinter for a modern, professional interface.
+
+PolicyHub provides a centralized register to track document metadata, review schedules, ownership, and relationships between policies and their implementing procedures. All data stays on your infrastructure—no cloud dependencies.
 
 ## Features
 
-- **Document Register** - Central tracking of all policies, procedures, manuals, and registers
-- **Review Management** - Track review dates with visual status indicators (overdue, due soon, on track)
-- **Multi-User Access** - Role-based permissions (Admin, Editor, Viewer) via shared network folder
-- **Document Links** - Map procedures to implementing policies
-- **Audit Trail** - Complete history of all changes
-- **Attachments** - Store actual policy documents alongside metadata
-- **Reports** - Generate PDF and Excel exports
+- **Document Register** — Central tracking of policies, procedures, manuals, and registers with filtering and search
+- **Review Management** — Visual status indicators (overdue, due soon, on track) with configurable thresholds
+- **Multi-User Access** — Role-based permissions (Admin, Editor, Viewer) via shared network folder
+- **Document Linking** — Map procedures to implementing policies with bidirectional relationships
+- **Attachments** — Store actual policy documents alongside metadata with version tracking
+- **Audit Trail** — Complete history of all changes with timestamps and user attribution
+- **Reports** — Generate PDF and Excel exports for compliance reviews
+- **Dashboard** — At-a-glance statistics and items requiring attention
 
-## System Requirements
+## Requirements
 
 - **Operating System:** Windows 10 or 11
-- **Python:** 3.11 or higher (for running from source)
-- **Network:** Access to shared folder for multi-user deployment
+- **Python:** 3.11+ (for running from source)
+- **Network:** Access to shared folder for multi-user deployment (optional)
 
 ## Installation
 
-### Option 1: Run from Source (Development)
+### Option 1: Run from Source
 
-1. **Clone or download the project:**
-   ```bash
-   git clone <repository-url>
-   cd policyhub
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/IddiLabs/PolicyHub.git
+cd PolicyHub
 
-2. **Create a virtual environment (recommended):**
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate
-   ```
+# Create virtual environment (recommended)
+python -m venv venv
+venv\Scripts\activate
 
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-4. **Run the application:**
-   ```bash
-   python main.py
-   ```
+# Run the application
+python main.py
+```
 
 ### Option 2: Build Standalone Executable
 
-1. **Install dependencies including PyInstaller:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-2. **Build the executable using the build script:**
-   ```bash
-   build.bat
-   ```
+# Build using the build script
+build.bat
 
-   Or manually with PyInstaller:
-   ```bash
-   pyinstaller PolicyHub.spec
-   ```
-
-3. **Find the executable in `dist/PolicyHub.exe`**
-
-## First-Time Setup
-
-1. **Launch PolicyHub**
-2. **Select Shared Folder:**
-   - Enter the path to your shared network folder (e.g., `\\server\PolicyHub`)
-   - Or select a local folder for single-user testing
-3. **Create Admin Account:**
-   - Enter username, full name, and password
-   - This will be the first administrator
-4. **Start Using PolicyHub!**
-
-## Shared Folder Structure
-
-PolicyHub creates the following structure in your shared folder:
-
-```
-\\server\PolicyHub\
-├── data\
-│   └── policyhub.db          # SQLite database
-├── attachments\
-│   └── [document files]      # Uploaded policy documents
-└── exports\
-    └── [report files]        # Generated reports
+# The executable will be at: build\PolicyHub.exe
 ```
 
-## User Roles
-
-| Role | Permissions |
-|------|-------------|
-| **Admin** | Full access including user management and settings |
-| **Editor** | Add/edit documents, upload attachments, manage links |
-| **Viewer** | Read-only access, can download and export |
-
-## Running Tests
+#### Build Options
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=. --cov-report=html
-
-# Run specific test file
-pytest tests/test_auth.py
+build.bat          # Standard build
+build.bat test     # Run tests before building
+build.bat clean    # Remove build artifacts
 ```
+
+## Quick Start
+
+1. **Launch PolicyHub** — Run `python main.py` or the built executable
+2. **Database Setup** — Choose to create a new database or connect to an existing one
+3. **Create Admin Account** — Set up the first administrator (new database only)
+4. **Login** — Enter credentials to access the application
+5. **Start Managing** — Add documents, track reviews, generate reports
+
+### Multi-User Setup
+
+For team collaboration via shared network folder:
+
+**Administrator:**
+1. Create new database in a shared network location (e.g., `\\server\PolicyHub`)
+2. Create admin account and additional user accounts
+3. Share the folder path with team members
+
+**Team Members:**
+1. Connect to existing database using the shared folder path
+2. Login with credentials provided by administrator
 
 ## Project Structure
 
 ```
-policyhub/
+PolicyHub/
 ├── main.py                 # Application entry point
 ├── requirements.txt        # Python dependencies
 ├── build.bat               # Windows build script
@@ -122,77 +95,109 @@ policyhub/
 ├── app/
 │   ├── application.py      # Main application class
 │   ├── constants.py        # Enums and constants
-│   └── theme.py            # Colors, fonts, spacing
+│   └── theme.py            # UI theme configuration
 ├── core/
-│   ├── config.py           # Local configuration
-│   ├── database.py         # SQLite connection manager
+│   ├── config.py           # Local configuration management
+│   ├── database.py         # SQLite database manager
 │   ├── session.py          # User session management
 │   └── permissions.py      # Role-based access control
 ├── models/                 # Data classes
 ├── services/               # Business logic layer
-│   ├── auth_service.py     # Authentication
-│   ├── user_service.py     # User management
-│   ├── document_service.py # Document CRUD
-│   ├── category_service.py # Category management
-│   ├── settings_service.py # Application settings
-│   ├── report_service.py   # Report generation
-│   └── ...                 # Other services
 ├── views/                  # UI screens
-│   ├── main_view.py        # Main application view
-│   ├── dashboard_view.py   # Dashboard with statistics
-│   ├── register_view.py    # Document register
-│   ├── reports_view.py     # Report generation
-│   ├── settings_view.py    # Settings container
-│   └── settings/           # Settings sub-views
 ├── dialogs/                # Modal dialogs
 ├── components/             # Reusable UI components
 ├── reports/                # PDF/Excel generators
 ├── utils/                  # Helper functions
-└── tests/                  # Pytest tests
+└── tests/                  # Test suite
 ```
+
+## User Roles
+
+| Role       | Permissions                                           |
+|------------|-------------------------------------------------------|
+| **Admin**  | Full access including user management and settings    |
+| **Editor** | Add/edit documents, upload attachments, manage links  |
+| **Viewer** | Read-only access, can download attachments and export |
 
 ## Configuration
 
-Local configuration is stored in:
+Local configuration is stored at:
 ```
 %LOCALAPPDATA%\PolicyHub\config.json
 ```
 
-Contains:
-- `shared_folder_path`: Path to the shared network folder
-- `remembered_username`: Username for auto-fill (if "remember me" checked)
+Application logs are written to:
+```
+%LOCALAPPDATA%\PolicyHub\logs\policyhub.log
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov=. --cov-report=html
+
+# Run specific test file
+pytest tests/test_auth.py
+```
+
+## Utilities
+
+### Password Reset
+
+If you forget your admin password, use the included utility:
+
+```bash
+python reset_password.py
+```
+
+Follow the prompts to reset a user's password directly in the database.
+
+## Tech Stack
+
+- **UI Framework:** CustomTkinter 5.2+
+- **Tables:** tksheet 7.0+
+- **Database:** SQLite3
+- **Password Hashing:** bcrypt
+- **Reports:** ReportLab (PDF), openpyxl (Excel)
+- **Packaging:** PyInstaller
 
 ## Troubleshooting
 
 ### "Database is locked" error
-- This can happen with slow network connections
-- The app uses a 30-second timeout; wait and retry
-- Ensure no other process is holding the database
+The application uses SQLite with WAL mode for concurrent access. With slow network connections, wait a moment and retry. Ensure no other process is holding the database.
 
 ### "Folder does not exist" on login
-- The shared folder may have been moved or renamed
-- Click "Change..." to select the new location
+The shared folder may have been moved or renamed. Use the database selection dialog to reconnect.
 
 ### Application won't start
-- Check logs in `%LOCALAPPDATA%\PolicyHub\logs\policyhub.log`
+- Check logs at `%LOCALAPPDATA%\PolicyHub\logs\policyhub.log`
 - Ensure Python 3.11+ is installed
 - Reinstall dependencies: `pip install -r requirements.txt`
 
+### Executable is blocked by antivirus
+Some antivirus software may flag PyInstaller executables. Add an exception for `PolicyHub.exe` or run from source.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
 ## License
 
-Open Source
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
-## Version
+## Acknowledgments
 
-2.0.0 - Complete Implementation
-
-**Completed Phases:**
-- Phase 1-2: Foundation & Authentication
-- Phase 3-4: Document Management & UI Components
-- Phase 5: Attachments & Document Linking
-- Phase 6: Reports & Settings
-- Phase 7: UI Modernization & Build System
-
----
-
-For more details, see `PolicyHub_PRD.md` and `CLAUDE.md`.
+- Built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) for modern UI
+- Tables powered by [tksheet](https://github.com/ragardner/tksheet)
+- PDF generation with [ReportLab](https://www.reportlab.com/)
+- Excel support via [openpyxl](https://openpyxl.readthedocs.io/)

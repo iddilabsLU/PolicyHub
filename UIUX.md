@@ -1,136 +1,127 @@
-## UI/UX Design
+# UI/UX Design Specifications
 
-### Design Philosophy
+Design specifications for PolicyHub's user interface.
+
+## Design Philosophy
 
 | Principle | Description |
 |-----------|-------------|
 | Professional & Serious | Financial compliance tool, not playful |
 | Clean & Uncluttered | Generous spacing, breathing room |
 | Sophisticated Neutrality | Muted tones, no vibrant colours |
-| Desktop-First | Optimised for professional workstations |
+| Desktop-First | Optimized for 1920x1080 workstations |
 | Light Mode Only | No dark theme (regulatory clarity focus) |
 
-### Colour Palette
+## Color Palette
 
-#### Primary Colours
+### Primary Colors
 
-| Name | Hex | RGB | Usage |
-|------|-----|-----|-------|
-| Primary (Ink Blue) | `#2D3E50` | 45, 62, 80 | Headers, buttons, key actions, icons |
-| Primary Foreground | `#FFFFFF` | 255, 255, 255 | Text on primary colour elements |
+| Name | Hex | Usage |
+|------|-----|-------|
+| Primary (Ink Blue) | `#2D3E50` | Headers, primary buttons, sidebar |
+| Primary Hover | `#3D5166` | Button hover states |
+| Primary Foreground | `#FFFFFF` | Text on primary elements |
 
-#### Secondary/Accent
+### Secondary/Accent
 
-| Name | Hex | RGB | Usage |
-|------|-----|-----|-------|
-| Secondary (Warm Grey-Beige) | `#E6E2DA` | 230, 226, 218 | Secondary actions, subtle highlights |
+| Name | Hex | Usage |
+|------|-----|-------|
+| Secondary (Warm Grey-Beige) | `#E6E2DA` | Secondary buttons, borders |
+| Secondary Hover | `#DDD8CF` | Secondary button hover |
+| Secondary Border | `#D1CCC3` | Border for secondary buttons |
 
-#### Backgrounds
+### Backgrounds
 
-| Name | Hex | RGB | Usage |
-|------|-----|-----|-------|
-| Background | `#F9FAFB` | 249, 250, 251 | Main application background |
-| Card/Panel | `#FFFFFF` | 255, 255, 255 | Cards, dialogs, elevated surfaces |
-| Muted | `#F3F4F6` | 243, 244, 246 | Table row stripes, input backgrounds |
-| Border | `#E5E7EB` | 229, 231, 235 | Borders, dividers |
+| Name | Hex | Usage |
+|------|-----|-------|
+| Background | `#F9FAFB` | Main window background |
+| Card/Panel | `#FFFFFF` | Cards, dialogs, elevated surfaces |
+| Muted | `#F3F4F6` | Table row stripes, input backgrounds |
+| Border | `#E5E7EB` | Borders, dividers |
+| Input Border | `#D1D5DB` | Input field borders |
 
-### Qt Stylesheet
+### Text Colors
 
-```css
-/* Main Window */
-QMainWindow {
-    background-color: #F9FAFB;
-}
+| Name | Hex | Usage |
+|------|-----|-------|
+| Text Primary | `#1F2937` | Main body text, headings |
+| Text Secondary | `#6B7280` | Labels, helper text, timestamps |
+| Text Muted | `#9CA3AF` | Placeholder text, disabled text |
 
-/* Primary Buttons */
-QPushButton[primary="true"] {
-    background-color: #2D3E50;
-    color: #FFFFFF;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: bold;
-}
+### Status Indicators
 
-QPushButton[primary="true"]:hover {
-    background-color: #3D4E60;
-}
+| Status | Color | Background | Usage |
+|--------|-------|------------|-------|
+| Danger | `#B91C1C` | `#FEE2E2` | Overdue, errors |
+| Warning | `#B45309` | `#FEF3C7` | Due soon (< 30 days) |
+| Caution | `#A16207` | `#FEF9C3` | Upcoming (< 90 days) |
+| Success | `#15803D` | `#DCFCE7` | On track, success |
 
-/* Secondary Buttons */
-QPushButton {
-    background-color: #E6E2DA;
-    color: #2D3E50;
-    border: 1px solid #D1CCC3;
-    padding: 8px 16px;
-    border-radius: 6px;
-}
+### Document Type Accents
 
-/* Danger Buttons */
-QPushButton[danger="true"] {
-    background-color: #B91C1C;
-    color: #FFFFFF;
-    border: none;
-}
+| Type | Color | Usage |
+|------|-------|-------|
+| Policy | `#6366F1` | Dashboard statistics |
+| Procedure | `#8B5CF6` | Dashboard statistics |
+| Manual | `#EC4899` | Dashboard statistics |
+| HR/Others | `#14B8A6` | Dashboard statistics |
 
-/* Input Fields */
-QLineEdit, QTextEdit, QComboBox, QDateEdit {
-    background-color: #FFFFFF;
-    border: 1px solid #E5E7EB;
-    padding: 6px 10px;
-    border-radius: 6px;
-}
+## Typography
 
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
-    border: 1px solid #2D3E50;
-}
+Font: **Segoe UI** (Windows system font)
 
-/* Table */
-QTableView {
-    background-color: #FFFFFF;
-    alternate-background-color: #F3F4F6;
-    border: 1px solid #E5E7EB;
-    gridline-color: #E5E7EB;
-}
+| Element | Size | Weight |
+|---------|------|--------|
+| Window Title | 16px | Semibold |
+| Section Heading | 14px | Semibold |
+| Body Text | 13px | Regular |
+| Small/Caption | 11px | Regular |
+| Button Text | 13px | Medium |
+| Table Header | 12px | Semibold |
+| Table Cell | 12px | Regular |
 
-QTableView::item:selected {
-    background-color: #2D3E50;
-    color: #FFFFFF;
-}
+## Spacing
 
-QHeaderView::section {
-    background-color: #2D3E50;
-    color: #FFFFFF;
-    padding: 8px;
-    border: none;
-    font-weight: bold;
-}
+| Element | Value |
+|---------|-------|
+| Window Padding | 20px |
+| Section Spacing | 24px |
+| Card Padding | 16px |
+| Button Padding (X/Y) | 10px / 8px |
+| Input Height | 36px |
+| Button Height | 36px |
+| Table Row Height | 32px |
+| Sidebar Width | 200px |
+| Corner Radius | 6px |
+| Corner Radius (Large) | 8px |
 
-/* Cards/Panels */
-QFrame[card="true"] {
-    background-color: #FFFFFF;
-    border: 1px solid #E5E7EB;
-    border-radius: 8px;
-}
+## Component Styling
 
-/* Labels */
-QLabel[heading="true"] {
-    color: #2D3E50;
-    font-size: 16px;
-    font-weight: bold;
-}
+All styling is implemented in `app/theme.py`. Use the provided helper functions:
 
-/* Progress Bars */
-QProgressBar {
-    background-color: #F3F4F6;
-    border: none;
-    border-radius: 4px;
-    height: 8px;
-}
-
-QProgressBar::chunk {
-    background-color: #2D3E50;
-    border-radius: 4px;
-}
+```python
+from app.theme import (
+    configure_button_style,    # Apply button styling
+    configure_input_style,     # Apply input field styling
+    configure_card_style,      # Apply card/panel styling
+    configure_dropdown_style,  # Apply dropdown styling
+    configure_label_style,     # Apply label styling
+    configure_table_style,     # Apply table styling
+)
 ```
 
----
+### Button Styles
+
+- **Primary:** Ink Blue background, white text
+- **Secondary:** Warm Grey-Beige background with border
+- **Danger:** Red background, white text
+
+### Card Style
+
+White background with subtle border, rounded corners (8px).
+
+### Table Style
+
+- Light grey header with bold text
+- White body with light border grid
+- Blue selection highlight
