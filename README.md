@@ -113,11 +113,23 @@ PolicyHub/
 
 ## User Roles
 
-| Role       | Permissions                                           |
-|------------|-------------------------------------------------------|
-| **Admin**  | Full access including user management and settings    |
-| **Editor** | Add/edit documents, upload attachments, manage links  |
-| **Viewer** | Read-only access, can download attachments and export |
+| Role                | Permissions                                              |
+|---------------------|----------------------------------------------------------|
+| **Admin**           | Full access including user management and settings       |
+| **Editor**          | Add/edit all documents, upload attachments, manage links |
+| **Editor Restricted** | Edit only documents in assigned categories/entities    |
+| **Viewer**          | Read-only access, can download attachments and export    |
+
+### Bulk User Import
+
+Admins can import multiple users at once using an Excel template:
+
+1. Go to **Settings → Users**
+2. Click **Template** to download the Excel template
+3. Fill in user data (use the Role dropdown)
+4. Click **Import** to add users
+
+All imported users will be required to change their password on first login.
 
 ## Configuration
 

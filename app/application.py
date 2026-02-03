@@ -115,9 +115,9 @@ class PolicyHubApp(ctk.CTk):
             logger.info(f"User chose to connect to existing database at: {folder_path}")
             self._connect_to_existing_database(folder_path)
         else:
-            # User cancelled - exit the application
+            # User cancelled - exit the application cleanly
             logger.info("User cancelled database selection, exiting")
-            self.destroy()
+            self._exit_application()
 
     def _connect_to_existing_database(self, folder_path: str) -> None:
         """
@@ -332,6 +332,21 @@ class PolicyHubApp(ctk.CTk):
         self.session_manager.logout()
         self.title(f"{APP_NAME} v{APP_VERSION}")
         self._show_login_view()
+
+    def _exit_application(self) -> None:
+        """Exit the application cleanly without errors."""
+        try:
+            # Withdraw window first to hide it
+            self.withdraw()
+            # Quit the mainloop
+            self.quit()
+        except Exception:
+            pass  # Ignore any errors during shutdown
+        finally:
+            try:
+                self.destroy()
+            except Exception:
+                pass  # Ignore if already destroyed
 
     def run(self) -> None:
         """Run the application main loop."""

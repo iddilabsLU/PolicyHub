@@ -234,3 +234,38 @@ See `UIUX.md` for visual design specifications:
 1. Add CREATE TABLE in `core/database.py` SCHEMA_SQL
 2. Create model in `models/`
 3. Create service in `services/`
+
+### Import Users from Excel
+
+The user import feature allows bulk user creation via Excel template:
+
+1. Navigate to **Settings → Users**
+2. Click **Template** to download `user_import_template.xlsx`
+3. Fill in user data:
+   - Username: 3-50 chars, alphanumeric + underscores
+   - Full Name: 2-100 characters
+   - Email: Valid, unique email address
+   - Role: Select from dropdown (ADMIN, EDITOR, EDITOR_RESTRICTED, VIEWER)
+   - Password: Minimum 8 characters
+4. Delete the example row (row 2)
+5. Click **Import** and select the file
+6. Confirm the import
+
+All imported users must change password on first login.
+
+## User Roles
+
+| Role | Description |
+|------|-------------|
+| ADMIN | Full access including user management and settings |
+| EDITOR | Add/edit all documents, upload attachments, manage links |
+| EDITOR_RESTRICTED | Edit only documents in assigned categories/entities |
+| VIEWER | Read-only access, can download attachments and export |
+
+### Editor Restricted Role
+
+Restricted editors can only view/edit documents matching their assigned:
+- **Categories** — Document category codes (e.g., "POL", "PROC")
+- **Entities** — Entity names (e.g., "Finance", "HR")
+
+Access uses OR logic: document matches if category OR entity matches.

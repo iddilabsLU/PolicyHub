@@ -350,6 +350,7 @@ class UsersSettingsView(BaseView):
 
         # Enable features (multi-select for bulk operations)
         self.table.enable_bindings(
+            "single_select",
             "row_select",
             "column_width_resize",
             "arrowkeys",
@@ -562,12 +563,25 @@ class UsersSettingsView(BaseView):
             self._refresh_table()
 
     def _on_double_click(self, event) -> None:
-        """Handle double-click on table row."""
+        """Handle double-click on table row to open edit dialog."""
         if not TKSHEET_AVAILABLE or not self.table:
             return
 
+        if len(self.filtered_users) == 0:
+            return
+
+        # Try to get row from click position first (more reliable)
+        try:
+            row = self.table.identify_row(event, allow_end=False)
+            if row is not None and 0 <= row < len(self.filtered_users):
+                self._edit_user(self.filtered_users[row])
+                return
+        except Exception:
+            pass
+
+        # Fallback: try to get from current selection
         selected = self.table.get_currently_selected()
-        if selected and len(self.filtered_users) > 0:
+        if selected:
             row = selected.row
             if 0 <= row < len(self.filtered_users):
                 self._edit_user(self.filtered_users[row])
@@ -820,26 +834,38 @@ class UsersSettingsView(BaseView):
             )
 
     def _on_download_template(self) -> None:
-        """Download CSV import template."""
+        """Download Excel import template."""
+        if not OPENPYXL_AVAILABLE:
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "Feature Unavailable",
+                "Excel template requires openpyxl library.",
+            )
+            return
+
         file_path = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
             title="Save Import Template",
-            defaultextension=".csv",
-            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
-            initialfile="user_import_template.csv",
+            defaultextension=".xlsx",
+            filetypes=[("Excel Files", "*.xlsx"), ("All Files", "*.*")],
+            initialfile="user_import_template.xlsx",
         )
 
         if not file_path:
             return
 
         try:
-            template = self.user_service.get_csv_template()
-            Path(file_path).write_text(template, encoding="utf-8")
+            self.user_service.create_xlsx_template(Path(file_path))
 
             InfoDialog.show_success(
                 self.winfo_toplevel(),
                 "Template Saved",
-                f"Import template saved to:\n{file_path}\n\nEdit the file to add users, then use Import to add them.",
+                f"Import template saved to:\n{file_path}\n\n"
+                "Instructions:\n"
+                "1. Open the template in Excel\n"
+                "2. Fill in user data (delete the example row)\n"
+                "3. Use the Role dropdown to select roles\n"
+                "4. Save and use Import to add users",
             )
 
         except Exception as e:
@@ -850,18 +876,34 @@ class UsersSettingsView(BaseView):
             )
 
     def _on_import_users(self) -> None:
-        """Import users from CSV file."""
+        """Import users from Excel or CSV file."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         file_path = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
-            title="Import Users from CSV",
-            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+            title="Import Users",
+            filetypes=[("Excel Files", "*.xlsx"), ("CSV Files", "*.csv"), ("All Files", "*.*")],
         )
 
         if not file_path:
+            logger.info("Import cancelled - no file selected")
             return
 
+        logger.info(f"Import: validating file {file_path}")
+
         # Validate first
-        result = self.user_service.validate_import_data(Path(file_path))
+        try:
+            result = self.user_service.validate_import_data(Path(file_path))
+            logger.info(f"Validation result: success={result.success}, count={result.imported_count}, errors={len(result.errors)}")
+        except Exception as e:
+            logger.error(f"Validation exception: {e}")
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "Validation Error",
+                f"Failed to validate file: {str(e)}",
+            )
+            return
 
         if not result.success:
             # Show all errors
@@ -876,8 +918,20 @@ class UsersSettingsView(BaseView):
             )
             return
 
+        # Check if any users found
+        if result.imported_count == 0:
+            InfoDialog.show_error(
+                self.winfo_toplevel(),
+                "No Users Found",
+                "No valid user rows were found in the file.\n\n"
+                "Make sure you have filled in user data in the template.",
+            )
+            return
+
+        logger.info(f"Showing confirmation dialog for {result.imported_count} users")
+
         # Confirm import
-        confirm = ConfirmDialog.show(
+        confirm = ConfirmDialog.ask(
             self.winfo_toplevel(),
             "Confirm Import",
             f"Ready to import {result.imported_count} user(s).\n\n"
@@ -886,11 +940,15 @@ class UsersSettingsView(BaseView):
         )
 
         if not confirm:
+            logger.info("Import cancelled by user")
             return
+
+        logger.info("User confirmed import, proceeding...")
 
         # Perform import
         try:
-            import_result = self.user_service.import_users_from_csv(Path(file_path))
+            import_result = self.user_service.import_users(Path(file_path))
+            logger.info(f"Import result: success={import_result.success}, count={import_result.imported_count}")
 
             if import_result.success:
                 InfoDialog.show_success(

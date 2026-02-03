@@ -493,7 +493,7 @@ class UserService:
 
     def get_csv_template(self) -> str:
         """
-        Get the CSV template content for user import.
+        Get the CSV template content for user import (legacy).
 
         Returns:
             CSV template string with headers and example
@@ -507,11 +507,279 @@ class UserService:
         ]
         return "\n".join(lines)
 
+    def create_xlsx_template(self, file_path: Path) -> None:
+        """
+        Create an Excel template file for user import.
+
+        The template includes:
+        - Formatted headers
+        - Data validation dropdown for roles
+        - Example row
+        - Instructions
+
+        Args:
+            file_path: Path to save the template
+        """
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+            from openpyxl.worksheet.datavalidation import DataValidation
+        except ImportError:
+            raise ImportError("openpyxl is required for Excel templates")
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Users"
+
+        # Define styles
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(start_color="2D3E50", end_color="2D3E50", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+
+        # Headers
+        headers = ["Username", "Full Name", "Email", "Role", "Password"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        # Column widths
+        ws.column_dimensions["A"].width = 15  # Username
+        ws.column_dimensions["B"].width = 25  # Full Name
+        ws.column_dimensions["C"].width = 30  # Email
+        ws.column_dimensions["D"].width = 15  # Role
+        ws.column_dimensions["E"].width = 20  # Password
+
+        # Example row with light background
+        example_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+        example_data = ["jsmith", "John Smith", "john.smith@example.com", "VIEWER", "TempPass123"]
+        for col, value in enumerate(example_data, 1):
+            cell = ws.cell(row=2, column=col, value=value)
+            cell.fill = example_fill
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        # Add role dropdown validation for rows 2-100
+        role_validation = DataValidation(
+            type="list",
+            formula1='"ADMIN,EDITOR,EDITOR_RESTRICTED,VIEWER"',
+            allow_blank=False,
+            showDropDown=False,
+        )
+        role_validation.error = "Please select a valid role"
+        role_validation.errorTitle = "Invalid Role"
+        role_validation.prompt = "Select a role"
+        role_validation.promptTitle = "Role"
+        ws.add_data_validation(role_validation)
+        role_validation.add("D2:D100")
+
+        # Add instructions sheet
+        instructions = wb.create_sheet("Instructions")
+        instructions["A1"] = "User Import Instructions"
+        instructions["A1"].font = Font(bold=True, size=14)
+
+        instructions_text = [
+            "",
+            "1. Fill in the 'Users' sheet with user data",
+            "2. Row 2 contains an example - replace or delete it",
+            "3. Each row will create one user",
+            "",
+            "Column Requirements:",
+            "• Username: 3-50 characters, letters/numbers/underscores only",
+            "• Full Name: 2-100 characters",
+            "• Email: Valid email address (required, must be unique)",
+            "• Role: Select from dropdown (ADMIN, EDITOR, EDITOR_RESTRICTED, VIEWER)",
+            "• Password: Minimum 8 characters",
+            "",
+            "Notes:",
+            "• All imported users will be required to change password on first login",
+            "• Usernames and emails must be unique (not already in system)",
+            "• Delete the example row before importing",
+        ]
+
+        for row, text in enumerate(instructions_text, 2):
+            instructions.cell(row=row, column=1, value=text)
+
+        instructions.column_dimensions["A"].width = 70
+
+        wb.save(file_path)
+
     def validate_import_data(self, file_path: Path) -> ImportResult:
         """
-        Validate CSV import data without actually importing.
+        Validate import data without actually importing.
 
-        Checks all rows and collects all errors before returning.
+        Supports both CSV and XLSX files.
+
+        Args:
+            file_path: Path to the CSV or XLSX file
+
+        Returns:
+            ImportResult with validation status and any errors
+        """
+        if file_path.suffix.lower() == ".xlsx":
+            return self._validate_xlsx_import(file_path)
+        else:
+            return self._validate_csv_import(file_path)
+
+    def _validate_xlsx_import(self, file_path: Path) -> ImportResult:
+        """
+        Validate XLSX import data.
+
+        Args:
+            file_path: Path to the XLSX file
+
+        Returns:
+            ImportResult with validation status and any errors
+        """
+        errors: List[ImportValidationError] = []
+        valid_rows = 0
+
+        # Track usernames and emails within the file for duplicates
+        seen_usernames: set[str] = set()
+        seen_emails: set[str] = set()
+
+        valid_roles = {r.value for r in UserRole}
+
+        try:
+            from openpyxl import load_workbook
+        except ImportError:
+            errors.append(ImportValidationError(0, "File", "openpyxl is required for Excel import"))
+            return ImportResult(success=False, imported_count=0, errors=errors)
+
+        try:
+            wb = load_workbook(file_path, data_only=True)
+
+            # Find the Users sheet or use first sheet
+            if "Users" in wb.sheetnames:
+                ws = wb["Users"]
+            else:
+                ws = wb.active
+
+            # Get headers from first row
+            headers = []
+            for cell in ws[1]:
+                if cell.value:
+                    headers.append(str(cell.value).strip().lower())
+
+            # Check required headers
+            required_headers = {"username", "full name", "email", "role", "password"}
+            # Normalize headers (handle "full name" vs "full_name")
+            normalized_headers = {h.replace(" ", "_") for h in headers}
+            normalized_headers.update({h.replace("_", " ") for h in headers})
+
+            # Map column indices
+            col_map = {}
+            for idx, header in enumerate(headers):
+                normalized = header.replace(" ", "_")
+                col_map[normalized] = idx
+
+            missing = []
+            for req in ["username", "full_name", "email", "role", "password"]:
+                if req not in col_map and req.replace("_", " ") not in col_map:
+                    missing.append(req)
+
+            if missing:
+                errors.append(ImportValidationError(
+                    0, "Headers", f"Missing required columns: {', '.join(missing)}"
+                ))
+                return ImportResult(success=False, imported_count=0, errors=errors)
+
+            # Process data rows (starting from row 2)
+            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                # Skip empty rows
+                if not row or all(cell is None or str(cell).strip() == "" for cell in row):
+                    continue
+
+                # Get values from row
+                def get_val(col_name: str) -> str:
+                    idx = col_map.get(col_name) or col_map.get(col_name.replace("_", " "))
+                    if idx is not None and idx < len(row) and row[idx] is not None:
+                        return str(row[idx]).strip()
+                    return ""
+
+                username = get_val("username")
+                full_name = get_val("full_name")
+                email = get_val("email")
+                role = get_val("role").upper()
+                password = get_val("password")
+
+                # Skip comment/example rows
+                if username.startswith("#") or username.lower() == "jsmith":
+                    continue
+
+                # Validate username
+                is_valid, msg = validate_username(username)
+                if not is_valid:
+                    errors.append(ImportValidationError(row_num, "Username", msg))
+                elif username.lower() in seen_usernames:
+                    errors.append(ImportValidationError(row_num, "Username", "Duplicate username in file"))
+                elif self.username_exists(username):
+                    errors.append(ImportValidationError(row_num, "Username", "Username already exists"))
+                else:
+                    seen_usernames.add(username.lower())
+
+                # Validate full name
+                is_valid, msg = validate_full_name(full_name)
+                if not is_valid:
+                    errors.append(ImportValidationError(row_num, "Full Name", msg))
+
+                # Validate email (required and unique)
+                if not email:
+                    errors.append(ImportValidationError(row_num, "Email", "Email is required"))
+                else:
+                    is_valid, msg = validate_email(email)
+                    if not is_valid:
+                        errors.append(ImportValidationError(row_num, "Email", msg))
+                    elif email.lower() in seen_emails:
+                        errors.append(ImportValidationError(row_num, "Email", "Duplicate email in file"))
+                    elif self.email_exists(email):
+                        errors.append(ImportValidationError(row_num, "Email", "Email already exists"))
+                    else:
+                        seen_emails.add(email.lower())
+
+                # Validate role
+                if not role:
+                    errors.append(ImportValidationError(row_num, "Role", "Role is required"))
+                elif role not in valid_roles:
+                    errors.append(ImportValidationError(
+                        row_num, "Role", f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"
+                    ))
+
+                # Validate password
+                is_valid, msg = validate_password(password)
+                if not is_valid:
+                    errors.append(ImportValidationError(row_num, "Password", msg))
+
+                # If no errors for this row, count it as valid
+                row_has_error = any(e.row == row_num for e in errors)
+                if not row_has_error:
+                    valid_rows += 1
+
+            wb.close()
+
+        except FileNotFoundError:
+            errors.append(ImportValidationError(0, "File", "File not found"))
+        except Exception as e:
+            errors.append(ImportValidationError(0, "File", f"Error reading Excel file: {str(e)}"))
+
+        return ImportResult(
+            success=len(errors) == 0,
+            imported_count=valid_rows,
+            errors=errors,
+        )
+
+    def _validate_csv_import(self, file_path: Path) -> ImportResult:
+        """
+        Validate CSV import data (legacy support).
 
         Args:
             file_path: Path to the CSV file
@@ -624,14 +892,14 @@ class UserService:
         )
 
     @require_permission(Permission.MANAGE_USERS)
-    def import_users_from_csv(self, file_path: Path) -> ImportResult:
+    def import_users(self, file_path: Path) -> ImportResult:
         """
-        Import users from a CSV file.
+        Import users from a CSV or XLSX file.
 
         Validates ALL rows first. Only imports if there are no errors.
 
         Args:
-            file_path: Path to the CSV file
+            file_path: Path to the CSV or XLSX file
 
         Returns:
             ImportResult with import status and any errors
@@ -644,7 +912,118 @@ class UserService:
         if not validation.success:
             return validation
 
-        # Now actually import
+        if file_path.suffix.lower() == ".xlsx":
+            return self._import_from_xlsx(file_path)
+        else:
+            return self._import_from_csv(file_path)
+
+    # Alias for backward compatibility
+    def import_users_from_csv(self, file_path: Path) -> ImportResult:
+        """Alias for import_users for backward compatibility."""
+        return self.import_users(file_path)
+
+    def _import_from_xlsx(self, file_path: Path) -> ImportResult:
+        """
+        Import users from XLSX file.
+
+        Args:
+            file_path: Path to the XLSX file
+
+        Returns:
+            ImportResult with import status
+        """
+        from openpyxl import load_workbook
+
+        imported_count = 0
+        created_by = SessionManager.get_instance().user_id
+        now = get_now()
+
+        wb = load_workbook(file_path, data_only=True)
+
+        # Find the Users sheet or use first sheet
+        if "Users" in wb.sheetnames:
+            ws = wb["Users"]
+        else:
+            ws = wb.active
+
+        # Get headers and build column map
+        headers = []
+        for cell in ws[1]:
+            if cell.value:
+                headers.append(str(cell.value).strip().lower())
+
+        col_map = {}
+        for idx, header in enumerate(headers):
+            normalized = header.replace(" ", "_")
+            col_map[normalized] = idx
+
+        # Process data rows
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            # Skip empty rows
+            if not row or all(cell is None or str(cell).strip() == "" for cell in row):
+                continue
+
+            # Get values from row
+            def get_val(col_name: str) -> str:
+                idx = col_map.get(col_name) or col_map.get(col_name.replace("_", " "))
+                if idx is not None and idx < len(row) and row[idx] is not None:
+                    return str(row[idx]).strip()
+                return ""
+
+            username = get_val("username")
+            full_name = get_val("full_name")
+            email = get_val("email")
+            role = get_val("role").upper()
+            password = get_val("password")
+
+            # Skip example/comment rows
+            if username.startswith("#") or username.lower() == "jsmith":
+                continue
+
+            user_id = generate_uuid()
+            password_hash = self.auth_service.hash_password(password)
+
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO users (
+                        user_id, username, password_hash, full_name, email,
+                        role, is_active, force_password_change, created_at, created_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        username,
+                        password_hash,
+                        full_name,
+                        email,
+                        role,
+                        now,
+                        created_by,
+                    ),
+                )
+
+            logger.info(f"User imported: {username} by {created_by}")
+            imported_count += 1
+
+        wb.close()
+
+        return ImportResult(
+            success=True,
+            imported_count=imported_count,
+            errors=[],
+        )
+
+    def _import_from_csv(self, file_path: Path) -> ImportResult:
+        """
+        Import users from CSV file (legacy support).
+
+        Args:
+            file_path: Path to the CSV file
+
+        Returns:
+            ImportResult with import status
+        """
         imported_count = 0
         created_by = SessionManager.get_instance().user_id
         now = get_now()

@@ -104,6 +104,7 @@ class DocumentService:
         applicable_entity: Optional[str] = None,
         order_by: str = "doc_ref",
         order_dir: str = "ASC",
+        bypass_restrictions: bool = False,
     ) -> List[Document]:
         """
         Get documents with optional filtering and sorting.
@@ -118,6 +119,7 @@ class DocumentService:
             applicable_entity: Filter by applicable entity name
             order_by: Column to sort by
             order_dir: Sort direction (ASC or DESC)
+            bypass_restrictions: If True, skip user restriction filtering (for admin stats)
 
         Returns:
             List of Document objects
@@ -175,7 +177,56 @@ class DocumentService:
                 if doc.review_status.value == review_status
             ]
 
+        # Apply user restrictions for EDITOR_RESTRICTED role
+        if not bypass_restrictions:
+            documents = self._apply_user_restrictions(documents)
+
         return documents
+
+    def _apply_user_restrictions(self, documents: List[Document]) -> List[Document]:
+        """
+        Filter documents based on the current user's restrictions.
+
+        For EDITOR_RESTRICTED users, only return documents that match
+        their allowed categories OR entities.
+
+        Args:
+            documents: List of documents to filter
+
+        Returns:
+            Filtered list of documents (or original list if user has no restrictions)
+        """
+        session = SessionManager.get_instance()
+
+        # Only filter for EDITOR_RESTRICTED role
+        if session.role != UserRole.EDITOR_RESTRICTED.value:
+            return documents
+
+        # Get user's restrictions
+        user_service = self._get_user_service()
+        restrictions = user_service.get_user_restrictions(session.user_id)
+
+        # If no restrictions defined, return empty (safety: restricted user with no restrictions sees nothing)
+        if not restrictions["categories"] and not restrictions["entities"]:
+            return []
+
+        # Filter documents that match allowed categories OR entities
+        filtered = []
+        for doc in documents:
+            # Check category match
+            if doc.category in restrictions["categories"]:
+                filtered.append(doc)
+                continue
+
+            # Check entity match (semicolon-separated entities)
+            if doc.applicable_entity and restrictions["entities"]:
+                doc_entities = [e.strip() for e in doc.applicable_entity.split(";") if e.strip()]
+                for entity in doc_entities:
+                    if entity in restrictions["entities"]:
+                        filtered.append(doc)
+                        break
+
+        return filtered
 
     def get_document_by_id(self, doc_id: str) -> Optional[Document]:
         """
@@ -236,47 +287,77 @@ class DocumentService:
     # Statistics Methods
     # ============================================================
 
-    def get_total_document_count(self) -> int:
+    def get_total_document_count(self, bypass_restrictions: bool = False) -> int:
         """
         Get total number of documents.
+
+        Args:
+            bypass_restrictions: If True, count all documents regardless of user role
 
         Returns:
             Total document count
         """
-        row = self.db.fetch_one("SELECT COUNT(*) as count FROM documents")
-        return row["count"] if row else 0
+        if bypass_restrictions:
+            row = self.db.fetch_one("SELECT COUNT(*) as count FROM documents")
+            return row["count"] if row else 0
 
-    def get_document_counts_by_status(self) -> Dict[str, int]:
+        # Use get_all_documents to respect user restrictions
+        documents = self.get_all_documents()
+        return len(documents)
+
+    def get_document_counts_by_status(self, bypass_restrictions: bool = False) -> Dict[str, int]:
         """
         Count documents grouped by status.
+
+        Args:
+            bypass_restrictions: If True, count all documents regardless of user role
 
         Returns:
             Dictionary mapping status to count
         """
-        rows = self.db.fetch_all(
-            """
-            SELECT status, COUNT(*) as count
-            FROM documents
-            GROUP BY status
-            """
-        )
-        return {row["status"]: row["count"] for row in rows}
+        if bypass_restrictions:
+            rows = self.db.fetch_all(
+                """
+                SELECT status, COUNT(*) as count
+                FROM documents
+                GROUP BY status
+                """
+            )
+            return {row["status"]: row["count"] for row in rows}
 
-    def get_document_counts_by_type(self) -> Dict[str, int]:
+        # Use get_all_documents to respect user restrictions
+        documents = self.get_all_documents()
+        counts: Dict[str, int] = {}
+        for doc in documents:
+            counts[doc.status] = counts.get(doc.status, 0) + 1
+        return counts
+
+    def get_document_counts_by_type(self, bypass_restrictions: bool = False) -> Dict[str, int]:
         """
         Count documents grouped by type.
+
+        Args:
+            bypass_restrictions: If True, count all documents regardless of user role
 
         Returns:
             Dictionary mapping type to count
         """
-        rows = self.db.fetch_all(
-            """
-            SELECT doc_type, COUNT(*) as count
-            FROM documents
-            GROUP BY doc_type
-            """
-        )
-        return {row["doc_type"]: row["count"] for row in rows}
+        if bypass_restrictions:
+            rows = self.db.fetch_all(
+                """
+                SELECT doc_type, COUNT(*) as count
+                FROM documents
+                GROUP BY doc_type
+                """
+            )
+            return {row["doc_type"]: row["count"] for row in rows}
+
+        # Use get_all_documents to respect user restrictions
+        documents = self.get_all_documents()
+        counts: Dict[str, int] = {}
+        for doc in documents:
+            counts[doc.doc_type] = counts.get(doc.doc_type, 0) + 1
+        return counts
 
     def get_review_status_counts(self) -> Dict[str, int]:
         """
@@ -325,9 +406,12 @@ class DocumentService:
 
         return attention_docs[:limit]
 
-    def get_overdue_documents(self) -> List[Document]:
+    def get_overdue_documents(self, bypass_restrictions: bool = False) -> List[Document]:
         """
         Get all overdue documents.
+
+        Args:
+            bypass_restrictions: If True, return all overdue docs regardless of user role
 
         Returns:
             List of overdue Document objects
@@ -342,7 +426,13 @@ class DocumentService:
             """,
             (today, DocumentStatus.ACTIVE.value),
         )
-        return [Document.from_row(row) for row in rows]
+        documents = [Document.from_row(row) for row in rows]
+
+        # Apply user restrictions for EDITOR_RESTRICTED role
+        if not bypass_restrictions:
+            documents = self._apply_user_restrictions(documents)
+
+        return documents
 
     # ============================================================
     # CRUD Methods

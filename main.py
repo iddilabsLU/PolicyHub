@@ -53,6 +53,13 @@ def main() -> None:
         app.run()
 
     except Exception as e:
+        # Ignore "application has been destroyed" errors - these are expected
+        # when the user closes the app early (e.g., cancels database selection)
+        error_msg = str(e).lower()
+        if "application has been destroyed" in error_msg:
+            logger.info("Application closed by user")
+            sys.exit(0)
+
         logger.exception(f"Fatal error: {e}")
         # Show error dialog
         try:
