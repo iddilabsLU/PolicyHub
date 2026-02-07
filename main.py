@@ -14,7 +14,9 @@ import logging
 import sys
 from pathlib import Path
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 
 
 def setup_logging() -> None:
@@ -42,29 +44,41 @@ def main() -> None:
     logger = logging.getLogger(__name__)
 
     try:
-        # Configure CustomTkinter
-        ctk.set_appearance_mode("light")  # Light mode only
-        ctk.set_default_color_theme("blue")  # Base theme (we override most colors)
+        # Enable high DPI scaling
+        QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+        )
 
-        # Import and run the application
+        # Create the application
+        app = QApplication(sys.argv)
+
+        # Set application metadata
+        app.setApplicationName("PolicyHub")
+        app.setApplicationVersion("1.0.0")
+        app.setOrganizationName("IddiLabs")
+
+        # Set default font
+        font = QFont("Segoe UI", 10)
+        app.setFont(font)
+
+        # Import and create the main window
         from app.application import PolicyHubApp
 
-        app = PolicyHubApp()
-        app.run()
+        window = PolicyHubApp()
+        window.run()
+
+        # Run the event loop
+        sys.exit(app.exec())
 
     except Exception as e:
-        # Ignore "application has been destroyed" errors - these are expected
-        # when the user closes the app early (e.g., cancels database selection)
-        error_msg = str(e).lower()
-        if "application has been destroyed" in error_msg:
-            logger.info("Application closed by user")
-            sys.exit(0)
-
         logger.exception(f"Fatal error: {e}")
         # Show error dialog
         try:
-            import tkinter.messagebox as messagebox
-            messagebox.showerror(
+            error_app = QApplication.instance()
+            if error_app is None:
+                error_app = QApplication(sys.argv)
+            QMessageBox.critical(
+                None,
                 "PolicyHub Error",
                 f"An unexpected error occurred:\n\n{str(e)}\n\nCheck the log file for details.",
             )

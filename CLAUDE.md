@@ -7,8 +7,8 @@ Development context for PolicyHub, a Windows desktop application for policy and 
 | Component | Technology |
 |-----------|------------|
 | Language | Python 3.11+ |
-| UI Framework | CustomTkinter 5.2+ |
-| Tables | tksheet 7.0+ |
+| UI Framework | PySide6 6.6+ |
+| Tables | QTableView (built-in) |
 | Database | SQLite3 (WAL mode) |
 | Password Hashing | bcrypt |
 | PDF Reports | ReportLab |
@@ -21,7 +21,7 @@ PolicyHub uses a layered architecture:
 
 ```
 ┌─────────────────────────────────────┐
-│           Views (UI)                │  CustomTkinter frames
+│           Views (UI)                │  PySide6 QWidgets
 ├─────────────────────────────────────┤
 │         Services (Business)         │  Auth, User, Document logic
 ├─────────────────────────────────────┤
@@ -56,17 +56,20 @@ PolicyHub/
 │   ├── link_service.py        # Document linking
 │   ├── settings_service.py    # Application settings CRUD
 │   └── report_service.py      # Report generation
-├── views/                     # UI screens
-│   ├── base_view.py           # BaseView, CenteredView, ScrollableView
-│   ├── main_view.py           # Main app with sidebar navigation
-│   ├── dashboard_view.py      # Statistics and attention items
-│   ├── register_view.py       # Document table with filtering
-│   ├── document_detail_view.py # Document details with tabs
-│   ├── settings_view.py       # Settings container
-│   ├── reports_view.py        # Report generation UI
-│   └── settings/              # Settings sub-views
-├── dialogs/                   # Modal dialogs
-├── components/                # Reusable UI components
+├── ui/                        # PySide6 UI layer
+│   ├── views/                 # UI screens (QWidget-based)
+│   │   ├── base_view.py       # BaseView, CenteredView, ScrollableView
+│   │   ├── main_view.py       # Main app with sidebar navigation
+│   │   ├── dashboard_view.py  # Statistics and attention items
+│   │   ├── register_view.py   # Document table with filtering
+│   │   ├── document_detail_view.py # Document details with tabs
+│   │   ├── settings_view.py   # Settings container
+│   │   ├── reports_view.py    # Report generation UI
+│   │   └── settings/          # Settings sub-views
+│   ├── dialogs/               # Modal dialogs (QDialog-based)
+│   ├── components/            # Reusable UI components
+│   ├── delegates/             # QTableView delegates
+│   └── models/                # Qt model classes
 ├── reports/                   # PDF/Excel generators
 ├── utils/                     # Helper functions
 └── tests/                     # Pytest test suite
@@ -119,7 +122,7 @@ def create_user(data):
 All views extend `BaseView`:
 
 ```python
-from views.base_view import BaseView
+from ui.views.base_view import BaseView
 
 class MyView(BaseView):
     def __init__(self, parent, app):
@@ -139,10 +142,11 @@ class MyView(BaseView):
 Always use theme constants from `app/theme.py`:
 
 ```python
-from app.theme import COLORS, TYPOGRAPHY, SPACING, configure_button_style
+from app.theme import COLORS, TYPOGRAPHY, SPACING, style_button
+from PySide6.QtWidgets import QPushButton
 
-button = ctk.CTkButton(parent, text="Save")
-configure_button_style(button, "primary")  # or "secondary", "danger"
+button = QPushButton("Save", parent)
+style_button(button, "primary")  # or "secondary", "danger", "flat"
 ```
 
 ## Database
@@ -218,7 +222,7 @@ See `UIUX.md` for visual design specifications:
 
 ### Add a New View
 
-1. Create file in `views/`
+1. Create file in `ui/views/`
 2. Extend `BaseView` or `CenteredView`
 3. Implement `_build_ui()` method
 4. Override `on_show()` for data refresh

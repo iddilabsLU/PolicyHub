@@ -1,5 +1,5 @@
 """
-PolicyHub Main Application
+PolicyHub Main Application (PySide6)
 
 The main application class that orchestrates the startup flow
 and manages view switching.
@@ -9,7 +9,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import customtkinter as ctk
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QStackedWidget
 
 from app.constants import APP_NAME, APP_VERSION
 from app.theme import COLORS, WINDOW_SIZE
@@ -21,7 +22,7 @@ from utils.files import get_database_path
 logger = logging.getLogger(__name__)
 
 
-class PolicyHubApp(ctk.CTk):
+class PolicyHubApp(QMainWindow):
     """
     Main PolicyHub application.
 
@@ -39,10 +40,10 @@ class PolicyHubApp(ctk.CTk):
         super().__init__()
 
         # Configure window
-        self.title(f"{APP_NAME} v{APP_VERSION}")
-        self.geometry(f"{WINDOW_SIZE.DEFAULT_WIDTH}x{WINDOW_SIZE.DEFAULT_HEIGHT}")
-        self.minsize(WINDOW_SIZE.MIN_WIDTH, WINDOW_SIZE.MIN_HEIGHT)
-        self.configure(fg_color=COLORS.BACKGROUND)
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
+        self.resize(WINDOW_SIZE.DEFAULT_WIDTH, WINDOW_SIZE.DEFAULT_HEIGHT)
+        self.setMinimumSize(WINDOW_SIZE.MIN_WIDTH, WINDOW_SIZE.MIN_HEIGHT)
+        self.setStyleSheet(f"background-color: {COLORS.BACKGROUND};")
 
         # Center window on screen
         self._center_window()
@@ -53,11 +54,11 @@ class PolicyHubApp(ctk.CTk):
         self.db: Optional[DatabaseManager] = None
 
         # View container
-        self.container = ctk.CTkFrame(self, fg_color=COLORS.BACKGROUND)
-        self.container.pack(fill="both", expand=True)
+        self.container = QStackedWidget()
+        self.setCentralWidget(self.container)
 
         # Current view
-        self.current_view: Optional[ctk.CTkFrame] = None
+        self.current_view: Optional[QWidget] = None
 
         # Ensure local folders exist
         self.config_manager.ensure_local_folders()
@@ -67,12 +68,10 @@ class PolicyHubApp(ctk.CTk):
 
     def _center_window(self) -> None:
         """Center the window on the screen."""
-        self.update_idletasks()
-        width = WINDOW_SIZE.DEFAULT_WIDTH
-        height = WINDOW_SIZE.DEFAULT_HEIGHT
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        screen = self.screen().availableGeometry()
+        x = (screen.width() - WINDOW_SIZE.DEFAULT_WIDTH) // 2
+        y = (screen.height() - WINDOW_SIZE.DEFAULT_HEIGHT) // 2
+        self.move(x, y)
 
     def _start_application_flow(self) -> None:
         """Start the application flow based on current state."""
@@ -99,7 +98,7 @@ class PolicyHubApp(ctk.CTk):
 
     def _show_database_selection_dialog(self) -> None:
         """Show the database selection dialog for first-time users."""
-        from dialogs.database_selection_dialog import (
+        from ui.dialogs.database_selection_dialog import (
             DatabaseSelectionDialog,
             RESULT_CREATE_NEW,
             RESULT_CONNECT,
@@ -201,7 +200,7 @@ class PolicyHubApp(ctk.CTk):
             error_message: Optional error message to display
             create_new: True if creating a new database (affects require_login default)
         """
-        from views.setup_view import SetupView
+        from ui.views.setup_view import SetupView
 
         self._clear_container()
 
@@ -215,13 +214,14 @@ class PolicyHubApp(ctk.CTk):
             error_message=error_message,
             create_new=create_new,
         )
-        view.pack(fill="both", expand=True)
+        self.container.addWidget(view)
+        self.container.setCurrentWidget(view)
         self.current_view = view
         view.on_show()
 
     def _show_admin_creation_view(self) -> None:
         """Show the admin creation view."""
-        from views.admin_creation_view import AdminCreationView
+        from ui.views.admin_creation_view import AdminCreationView
 
         self._clear_container()
 
@@ -231,13 +231,14 @@ class PolicyHubApp(ctk.CTk):
             db=self.db,
             on_complete=self._on_admin_created,
         )
-        view.pack(fill="both", expand=True)
+        self.container.addWidget(view)
+        self.container.setCurrentWidget(view)
         self.current_view = view
         view.on_show()
 
     def _show_login_view(self) -> None:
         """Show the login view."""
-        from views.login_view import LoginView
+        from ui.views.login_view import LoginView
 
         self._clear_container()
 
@@ -248,13 +249,14 @@ class PolicyHubApp(ctk.CTk):
             on_login=self._on_login_success,
             on_change_folder=self._on_change_folder,
         )
-        view.pack(fill="both", expand=True)
+        self.container.addWidget(view)
+        self.container.setCurrentWidget(view)
         self.current_view = view
         view.on_show()
 
     def _show_force_password_view(self) -> None:
         """Show the force password change view."""
-        from views.force_password_view import ForcePasswordChangeView
+        from ui.views.force_password_view import ForcePasswordChangeView
 
         self._clear_container()
 
@@ -264,13 +266,14 @@ class PolicyHubApp(ctk.CTk):
             db=self.db,
             on_password_changed=self._on_password_changed,
         )
-        view.pack(fill="both", expand=True)
+        self.container.addWidget(view)
+        self.container.setCurrentWidget(view)
         self.current_view = view
         view.on_show()
 
     def _show_main_view(self) -> None:
         """Show the main application view."""
-        from views.main_view import MainView
+        from ui.views.main_view import MainView
 
         self._clear_container()
 
@@ -278,20 +281,23 @@ class PolicyHubApp(ctk.CTk):
             parent=self.container,
             app=self,
         )
-        view.pack(fill="both", expand=True)
+        self.container.addWidget(view)
+        self.container.setCurrentWidget(view)
         self.current_view = view
         view.on_show()
 
         # Update window title with user info
         user = self.session_manager.current_user
         if user:
-            self.title(f"{APP_NAME} - {user.full_name} ({user.role_display})")
+            self.setWindowTitle(f"{APP_NAME} - {user.full_name} ({user.role_display})")
 
     def _clear_container(self) -> None:
         """Clear the current view from the container."""
         if self.current_view:
-            self.current_view.on_hide()
-            self.current_view.destroy()
+            if hasattr(self.current_view, 'on_hide'):
+                self.current_view.on_hide()
+            self.container.removeWidget(self.current_view)
+            self.current_view.deleteLater()
             self.current_view = None
 
     def _on_setup_complete(self) -> None:
@@ -330,25 +336,17 @@ class PolicyHubApp(ctk.CTk):
         """Log out the current user."""
         logger.info("User logging out")
         self.session_manager.logout()
-        self.title(f"{APP_NAME} v{APP_VERSION}")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self._show_login_view()
 
     def _exit_application(self) -> None:
         """Exit the application cleanly without errors."""
         try:
-            # Withdraw window first to hide it
-            self.withdraw()
-            # Quit the mainloop
-            self.quit()
+            self.close()
         except Exception:
             pass  # Ignore any errors during shutdown
-        finally:
-            try:
-                self.destroy()
-            except Exception:
-                pass  # Ignore if already destroyed
 
     def run(self) -> None:
-        """Run the application main loop."""
+        """Show the main window (QApplication.exec() handles the event loop)."""
         logger.info(f"Starting {APP_NAME} v{APP_VERSION}")
-        self.mainloop()
+        self.show()

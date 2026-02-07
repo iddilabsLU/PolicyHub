@@ -283,6 +283,8 @@ class HistoryService:
         """
         Get history entries for a document.
 
+        Returns entries with username resolved from user ID.
+
         Args:
             doc_id: Document ID
             limit: Maximum number of entries to return
@@ -292,14 +294,23 @@ class HistoryService:
         """
         rows = self.db.fetch_all(
             """
-            SELECT * FROM document_history
-            WHERE doc_id = ?
-            ORDER BY changed_at DESC
+            SELECT dh.*, u.username
+            FROM document_history dh
+            LEFT JOIN users u ON dh.changed_by = u.user_id
+            WHERE dh.doc_id = ?
+            ORDER BY dh.changed_at DESC
             LIMIT ?
             """,
             (doc_id, limit),
         )
-        return [HistoryEntry.from_row(row) for row in rows]
+        entries = []
+        for row in rows:
+            entry = HistoryEntry.from_row(row)
+            # Replace user ID with username if available
+            if row["username"]:
+                entry.changed_by = row["username"]
+            entries.append(entry)
+        return entries
 
     def get_recent_activity(
         self,

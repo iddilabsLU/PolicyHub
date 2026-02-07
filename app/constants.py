@@ -15,7 +15,8 @@ class DocumentType(str, Enum):
     POLICY = "POLICY"
     PROCEDURE = "PROCEDURE"
     MANUAL = "MANUAL"
-    HR_OTHERS = "HR_OTHERS"
+    HR = "HR"
+    OTHERS = "OTHERS"
 
     @property
     def display_name(self) -> str:
@@ -24,7 +25,8 @@ class DocumentType(str, Enum):
             "POLICY": "Policy",
             "PROCEDURE": "Procedure",
             "MANUAL": "Manual",
-            "HR_OTHERS": "HR Others",
+            "HR": "HR",
+            "OTHERS": "Others",
         }
         return names[self.value]
 
@@ -35,7 +37,8 @@ class DocumentType(str, Enum):
             "POLICY": "POL",
             "PROCEDURE": "PROC",
             "MANUAL": "MAN",
-            "HR_OTHERS": "HR",
+            "HR": "HR",
+            "OTHERS": "OTH",
         }
         return prefixes[self.value]
 
@@ -46,7 +49,6 @@ class DocumentStatus(str, Enum):
     DRAFT = "DRAFT"
     ACTIVE = "ACTIVE"
     UNDER_REVIEW = "UNDER_REVIEW"
-    SUPERSEDED = "SUPERSEDED"
     ARCHIVED = "ARCHIVED"
 
     @property
@@ -56,7 +58,6 @@ class DocumentStatus(str, Enum):
             "DRAFT": "Draft",
             "ACTIVE": "Active",
             "UNDER_REVIEW": "Under Review",
-            "SUPERSEDED": "Superseded",
             "ARCHIVED": "Archived",
         }
         return names[self.value]

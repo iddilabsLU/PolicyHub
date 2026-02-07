@@ -45,14 +45,14 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 -- Documents table
 CREATE TABLE IF NOT EXISTS documents (
     doc_id TEXT PRIMARY KEY,
-    doc_type TEXT NOT NULL CHECK (doc_type IN ('POLICY', 'PROCEDURE', 'MANUAL', 'HR_OTHERS')),
+    doc_type TEXT NOT NULL CHECK (doc_type IN ('POLICY', 'PROCEDURE', 'MANUAL', 'HR', 'OTHERS')),
     doc_ref TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
     category TEXT NOT NULL,
     owner TEXT NOT NULL,
     approver TEXT,
-    status TEXT NOT NULL CHECK (status IN ('DRAFT', 'ACTIVE', 'UNDER_REVIEW', 'SUPERSEDED', 'ARCHIVED')),
+    status TEXT NOT NULL CHECK (status IN ('DRAFT', 'ACTIVE', 'UNDER_REVIEW', 'ARCHIVED')),
     version TEXT NOT NULL,
     effective_date TEXT NOT NULL,
     last_review_date TEXT NOT NULL,
@@ -339,8 +339,11 @@ class DatabaseManager:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_mandatory ON documents(mandatory_read_all)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_entity ON documents(applicable_entity)")
 
-        # Migration: Update REGISTER to HR_OTHERS for existing documents
-        conn.execute("UPDATE documents SET doc_type = 'HR_OTHERS' WHERE doc_type = 'REGISTER'")
+        # Migration: Update REGISTER and HR_OTHERS to HR for existing documents
+        conn.execute("UPDATE documents SET doc_type = 'HR' WHERE doc_type IN ('REGISTER', 'HR_OTHERS')")
+
+        # Migration: Update SUPERSEDED status to ARCHIVED for existing documents
+        conn.execute("UPDATE documents SET status = 'ARCHIVED' WHERE status = 'SUPERSEDED'")
 
         # Check users table columns for user management migrations
         cursor = conn.execute("PRAGMA table_info(users)")

@@ -2,7 +2,7 @@
 
 **Policy & Procedure Lifecycle Manager**
 
-A native Windows desktop application for managing policies and procedures in regulated entities. Built with Python and CustomTkinter for a modern, professional interface.
+A native Windows desktop application for managing policies and procedures in regulated entities. Built with Python and PySide6 for a modern, professional interface.
 
 PolicyHub provides a centralized register to track document metadata, review schedules, ownership, and relationships between policies and their implementing procedures. All data stays on your infrastructure—no cloud dependencies.
 
@@ -103,9 +103,14 @@ PolicyHub/
 │   └── permissions.py      # Role-based access control
 ├── models/                 # Data classes
 ├── services/               # Business logic layer
-├── views/                  # UI screens
-├── dialogs/                # Modal dialogs
-├── components/             # Reusable UI components
+├── ui/                     # PySide6 UI layer
+│   ├── views/              # UI screens
+│   ├── dialogs/            # Modal dialogs
+│   ├── components/         # Reusable UI components
+│   ├── delegates/          # QTableView delegates
+│   └── models/             # Qt model classes
+├── resources/
+│   └── styles/             # QSS stylesheets
 ├── reports/                # PDF/Excel generators
 ├── utils/                  # Helper functions
 └── tests/                  # Test suite
@@ -170,9 +175,8 @@ Follow the prompts to reset a user's password directly in the database.
 
 ## Tech Stack
 
-- **UI Framework:** CustomTkinter 5.2+
-- **Tables:** tksheet 7.0+
-- **Database:** SQLite3
+- **UI Framework:** PySide6 6.6+
+- **Database:** SQLite3 (WAL mode for concurrent access)
 - **Password Hashing:** bcrypt
 - **Reports:** ReportLab (PDF), openpyxl (Excel)
 - **Packaging:** PyInstaller
@@ -209,7 +213,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Acknowledgments
 
-- Built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) for modern UI
-- Tables powered by [tksheet](https://github.com/ragardner/tksheet)
+- Built with [PySide6](https://doc.qt.io/qtforpython-6/) (Qt for Python)
 - PDF generation with [ReportLab](https://www.reportlab.com/)
 - Excel support via [openpyxl](https://openpyxl.readthedocs.io/)

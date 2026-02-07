@@ -2,9 +2,7 @@
 # Python 3.11+ required
 
 # UI Framework
-customtkinter>=5.2.0
-tksheet>=7.0.0
-tkcalendar>=1.6.1
+PySide6>=6.6.0
 
 # Security
 bcrypt>=4.0.0

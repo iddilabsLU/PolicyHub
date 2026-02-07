@@ -365,6 +365,7 @@ class DocumentService:
 
         Note: Review status is calculated, not stored, so we fetch
         all documents and count in Python.
+        Archived documents are excluded as they are no longer actively managed.
 
         Returns:
             Dictionary mapping review status to count
@@ -373,6 +374,8 @@ class DocumentService:
         counts = {status.value: 0 for status in ReviewStatus}
 
         for doc in documents:
+            if doc.status == DocumentStatus.ARCHIVED.value:
+                continue
             status = doc.review_status.value
             counts[status] = counts.get(status, 0) + 1
 
@@ -381,6 +384,8 @@ class DocumentService:
     def get_documents_requiring_attention(self, limit: int = 10) -> List[Document]:
         """
         Get documents that are overdue or due soon.
+
+        Archived documents are excluded as they are no longer actively managed.
 
         Args:
             limit: Maximum number of documents to return
@@ -394,6 +399,7 @@ class DocumentService:
         attention_docs = [
             doc for doc in documents
             if doc.review_status in (ReviewStatus.OVERDUE, ReviewStatus.DUE_SOON)
+            and doc.status != DocumentStatus.ARCHIVED.value
         ]
 
         # Sort by review status (OVERDUE first) then by date

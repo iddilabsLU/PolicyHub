@@ -13,7 +13,8 @@ Design Principles:
 """
 
 from dataclasses import dataclass
-from typing import Tuple
+
+from PySide6.QtGui import QFont
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,19 @@ class Colors:
     ACCENT_POLICY: str = "#6366F1"     # Indigo
     ACCENT_PROCEDURE: str = "#8B5CF6"  # Purple
     ACCENT_MANUAL: str = "#EC4899"     # Pink
-    ACCENT_HR_OTHERS: str = "#14B8A6"  # Teal
+    ACCENT_HR: str = "#14B8A6"         # Teal
+    ACCENT_OTHERS: str = "#F59E0B"     # Amber
+
+    # Filter Active State
+    FILTER_ACTIVE_BG: str = "#E0F2FE"  # Light blue background
+    FILTER_ACTIVE_BORDER: str = "#0EA5E9"  # Blue border
+
+    # Info Colors (for toast notifications)
+    INFO: str = "#0369A1"  # Info text color
+    INFO_BG: str = "#E0F2FE"  # Info background
+
+    # Error alias (same as DANGER)
+    ERROR: str = "#B91C1C"  # Error states (alias for DANGER)
 
 
 @dataclass(frozen=True)
@@ -67,7 +80,7 @@ class Typography:
 
     FONT_FAMILY: str = "Segoe UI"
 
-    # Font sizes (in pixels)
+    # Font sizes (in pixels/points)
     SIZE_WINDOW_TITLE: int = 16
     SIZE_SECTION_HEADING: int = 14
     SIZE_BODY: int = 13
@@ -76,54 +89,55 @@ class Typography:
     SIZE_TABLE_HEADER: int = 12
     SIZE_TABLE_CELL: int = 12
 
-    # Font weights
-    WEIGHT_REGULAR: str = "normal"
-    WEIGHT_MEDIUM: str = "bold"  # CustomTkinter uses 'bold' for medium
-    WEIGHT_SEMIBOLD: str = "bold"
+    # Font weights (Qt uses integers: 400=normal, 500=medium, 600=semibold, 700=bold)
+    WEIGHT_REGULAR: int = QFont.Weight.Normal
+    WEIGHT_MEDIUM: int = QFont.Weight.Medium
+    WEIGHT_SEMIBOLD: int = QFont.Weight.DemiBold
+    WEIGHT_BOLD: int = QFont.Weight.Bold
 
-    def get_font(
-        self, size: int, weight: str = "normal"
-    ) -> Tuple[str, int, str]:
-        """Return a font tuple for CustomTkinter widgets."""
-        return (self.FONT_FAMILY, size, weight)
+    def get_font(self, size: int, weight: int = QFont.Weight.Normal) -> QFont:
+        """Return a QFont for PySide6 widgets."""
+        font = QFont(self.FONT_FAMILY, size)
+        font.setWeight(weight)
+        return font
 
     @property
-    def window_title(self) -> Tuple[str, int, str]:
+    def window_title(self) -> QFont:
         """Font for window titles."""
         return self.get_font(self.SIZE_WINDOW_TITLE, self.WEIGHT_SEMIBOLD)
 
     @property
-    def section_heading(self) -> Tuple[str, int, str]:
+    def section_heading(self) -> QFont:
         """Font for section headings."""
         return self.get_font(self.SIZE_SECTION_HEADING, self.WEIGHT_SEMIBOLD)
 
     @property
-    def section_title(self) -> Tuple[str, int, str]:
+    def section_title(self) -> QFont:
         """Alias for section_heading (for compatibility)."""
         return self.section_heading
 
     @property
-    def body(self) -> Tuple[str, int, str]:
+    def body(self) -> QFont:
         """Font for body text."""
         return self.get_font(self.SIZE_BODY, self.WEIGHT_REGULAR)
 
     @property
-    def small(self) -> Tuple[str, int, str]:
+    def small(self) -> QFont:
         """Font for small/caption text."""
         return self.get_font(self.SIZE_SMALL, self.WEIGHT_REGULAR)
 
     @property
-    def button(self) -> Tuple[str, int, str]:
+    def button(self) -> QFont:
         """Font for button text."""
         return self.get_font(self.SIZE_BUTTON, self.WEIGHT_MEDIUM)
 
     @property
-    def table_header(self) -> Tuple[str, int, str]:
+    def table_header(self) -> QFont:
         """Font for table headers."""
         return self.get_font(self.SIZE_TABLE_HEADER, self.WEIGHT_SEMIBOLD)
 
     @property
-    def table_cell(self) -> Tuple[str, int, str]:
+    def table_cell(self) -> QFont:
         """Font for table cells."""
         return self.get_font(self.SIZE_TABLE_CELL, self.WEIGHT_REGULAR)
 
@@ -174,195 +188,112 @@ SPACING = Spacing()
 WINDOW_SIZE = WindowSize()
 
 
-def configure_button_style(button, style: str = "primary") -> None:
+def style_button(button, style: str = "primary") -> None:
     """
-    Apply consistent styling to a CustomTkinter button.
+    Apply consistent styling to a PySide6 QPushButton.
 
     Args:
-        button: The CTkButton instance to style
+        button: The QPushButton instance to style
         style: 'primary', 'secondary', or 'danger'
     """
+    base_style = f"""
+        QPushButton {{
+            border-radius: {SPACING.CORNER_RADIUS}px;
+            padding: {SPACING.BUTTON_PADDING_Y}px {SPACING.BUTTON_PADDING_X}px;
+            font-family: {TYPOGRAPHY.FONT_FAMILY};
+            font-size: {TYPOGRAPHY.SIZE_BUTTON}px;
+            font-weight: 500;
+            min-height: {SPACING.BUTTON_HEIGHT}px;
+        }}
+    """
+
     if style == "primary":
-        button.configure(
-            fg_color=COLORS.PRIMARY,
-            hover_color=COLORS.PRIMARY_HOVER,
-            text_color=COLORS.PRIMARY_FOREGROUND,
-            corner_radius=SPACING.CORNER_RADIUS,
-            height=SPACING.BUTTON_HEIGHT,
-            font=TYPOGRAPHY.button,
-        )
+        button.setStyleSheet(base_style + f"""
+            QPushButton {{
+                background-color: {COLORS.PRIMARY};
+                color: {COLORS.PRIMARY_FOREGROUND};
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.PRIMARY_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS.PRIMARY};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLORS.MUTED};
+                color: {COLORS.TEXT_MUTED};
+            }}
+        """)
     elif style == "secondary":
-        button.configure(
-            fg_color=COLORS.SECONDARY,
-            hover_color=COLORS.SECONDARY_HOVER,
-            text_color=COLORS.SECONDARY_FOREGROUND,
-            border_width=1,
-            border_color=COLORS.SECONDARY_BORDER,
-            corner_radius=SPACING.CORNER_RADIUS,
-            height=SPACING.BUTTON_HEIGHT,
-            font=TYPOGRAPHY.button,
-        )
+        button.setStyleSheet(base_style + f"""
+            QPushButton {{
+                background-color: {COLORS.CARD};
+                color: {COLORS.TEXT_PRIMARY};
+                border: 1px solid {COLORS.INPUT_BORDER};
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.MUTED};
+                border: 1px solid {COLORS.SECONDARY_BORDER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS.SECONDARY};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLORS.MUTED};
+                color: {COLORS.TEXT_MUTED};
+            }}
+        """)
     elif style == "danger":
-        button.configure(
-            fg_color=COLORS.DANGER,
-            hover_color=COLORS.DANGER_HOVER,
-            text_color=COLORS.PRIMARY_FOREGROUND,
-            corner_radius=SPACING.CORNER_RADIUS,
-            height=SPACING.BUTTON_HEIGHT,
-            font=TYPOGRAPHY.button,
-        )
+        button.setStyleSheet(base_style + f"""
+            QPushButton {{
+                background-color: {COLORS.DANGER};
+                color: {COLORS.PRIMARY_FOREGROUND};
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.DANGER_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS.DANGER};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLORS.MUTED};
+                color: {COLORS.TEXT_MUTED};
+            }}
+        """)
+    elif style == "flat":
+        button.setStyleSheet(base_style + f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS.PRIMARY};
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.MUTED};
+                color: {COLORS.PRIMARY_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS.SECONDARY};
+            }}
+            QPushButton:disabled {{
+                color: {COLORS.TEXT_MUTED};
+            }}
+        """)
 
 
-def configure_input_style(entry) -> None:
+def style_card(widget, with_shadow: bool = False) -> None:
     """
-    Apply consistent styling to a CustomTkinter entry.
+    Apply card styling to a PySide6 QWidget/QFrame.
 
     Args:
-        entry: The CTkEntry instance to style
+        widget: The QWidget or QFrame instance to style as a card
+        with_shadow: If True, not used (kept for API compatibility)
     """
-    entry.configure(
-        fg_color=COLORS.CARD,
-        border_color=COLORS.INPUT_BORDER,
-        text_color=COLORS.TEXT_PRIMARY,
-        placeholder_text_color=COLORS.TEXT_MUTED,
-        corner_radius=SPACING.CORNER_RADIUS,
-        height=SPACING.INPUT_HEIGHT,
-        font=TYPOGRAPHY.body,
-        border_width=1,
-    )
-
-
-def configure_card_style(frame, with_shadow: bool = False) -> None:
-    """
-    Apply card styling to a CustomTkinter frame.
-
-    Args:
-        frame: The CTkFrame instance to style
-        with_shadow: If True, use a slightly darker border for shadow effect
-    """
-    border_color = "#D1D5DB" if with_shadow else COLORS.BORDER
-    frame.configure(
-        fg_color=COLORS.CARD,
-        corner_radius=SPACING.CORNER_RADIUS_LARGE,
-        border_width=1,
-        border_color=border_color,
-    )
-
-
-def configure_dropdown_style(dropdown) -> None:
-    """
-    Apply consistent light styling to a CTkOptionMenu.
-
-    Fixes the dark blue dropdown issue by using lighter colors
-    that match the professional theme.
-
-    Args:
-        dropdown: The CTkOptionMenu instance to style
-    """
-    dropdown.configure(
-        fg_color=COLORS.CARD,
-        button_color=COLORS.SECONDARY,
-        button_hover_color=COLORS.SECONDARY_HOVER,
-        dropdown_fg_color=COLORS.CARD,
-        dropdown_hover_color=COLORS.MUTED,
-        text_color=COLORS.TEXT_PRIMARY,
-        corner_radius=SPACING.CORNER_RADIUS,
-    )
-
-
-def configure_label_style(label, style: str = "body") -> None:
-    """
-    Apply consistent styling to a CustomTkinter label.
-
-    Args:
-        label: The CTkLabel instance to style
-        style: 'heading', 'body', 'secondary', or 'muted'
-    """
-    styles = {
-        "heading": (TYPOGRAPHY.section_heading, COLORS.TEXT_PRIMARY),
-        "body": (TYPOGRAPHY.body, COLORS.TEXT_PRIMARY),
-        "secondary": (TYPOGRAPHY.body, COLORS.TEXT_SECONDARY),
-        "muted": (TYPOGRAPHY.small, COLORS.TEXT_MUTED),
-    }
-    font, color = styles.get(style, styles["body"])
-    label.configure(font=font, text_color=color)
-
-
-def get_table_header_style() -> dict:
-    """
-    Get styling dictionary for tksheet headers.
-
-    Returns:
-        Dictionary of header styling options for tksheet
-    """
-    return {
-        "header_bg": COLORS.MUTED,
-        "header_fg": COLORS.TEXT_PRIMARY,
-        "header_grid_fg": COLORS.BORDER,
-        "header_border_fg": COLORS.BORDER,
-        "header_selected_cells_bg": COLORS.SECONDARY,
-        "header_selected_cells_fg": COLORS.TEXT_PRIMARY,
-    }
-
-
-def get_table_body_style() -> dict:
-    """
-    Get styling dictionary for tksheet body/cells.
-
-    Returns:
-        Dictionary of body styling options for tksheet
-    """
-    return {
-        "table_bg": COLORS.CARD,
-        "table_fg": COLORS.TEXT_PRIMARY,
-        "table_grid_fg": COLORS.BORDER,
-        "table_selected_cells_border_fg": COLORS.PRIMARY,
-        "table_selected_cells_bg": COLORS.PRIMARY,
-        "table_selected_cells_fg": COLORS.PRIMARY_FOREGROUND,
-    }
-
-
-def get_table_index_style() -> dict:
-    """
-    Get styling dictionary for tksheet row index.
-
-    Returns:
-        Dictionary of index styling options for tksheet
-    """
-    return {
-        "index_bg": COLORS.MUTED,
-        "index_fg": COLORS.TEXT_SECONDARY,
-        "index_grid_fg": COLORS.BORDER,
-        "index_border_fg": COLORS.BORDER,
-        "index_selected_cells_bg": COLORS.SECONDARY,
-        "index_selected_cells_fg": COLORS.TEXT_PRIMARY,
-    }
-
-
-def configure_table_style(table) -> None:
-    """
-    Apply full styling to a tksheet Table/Sheet widget.
-
-    Args:
-        table: The tksheet Sheet instance to style
-    """
-    # Header styling
-    table.set_options(**get_table_header_style())
-
-    # Body styling
-    table.set_options(**get_table_body_style())
-
-    # Index styling (if shown)
-    table.set_options(**get_table_index_style())
-
-    # General options
-    table.set_options(
-        font=("Segoe UI", 11, "normal"),
-        header_font=("Segoe UI", 11, "bold"),
-        index_font=("Segoe UI", 10, "normal"),
-        outline_thickness=1,
-        outline_color=COLORS.BORDER,
-        frame_bg=COLORS.CARD,
-        top_left_bg=COLORS.MUTED,
-        top_left_fg=COLORS.TEXT_SECONDARY,
-    )
+    widget.setStyleSheet(f"""
+        QFrame, QWidget {{
+            background-color: {COLORS.CARD};
+            border-radius: {SPACING.CORNER_RADIUS_LARGE}px;
+            border: none;
+        }}
+    """)

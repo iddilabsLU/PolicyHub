@@ -1,7 +1,7 @@
 """
 PolicyHub Document Model
 
-Represents a policy, procedure, manual, or register in the system.
+Represents a policy, procedure, manual, HR, or other document in the system.
 """
 
 from dataclasses import dataclass
@@ -19,7 +19,7 @@ class Document:
 
     Attributes:
         doc_id: Unique identifier (UUID)
-        doc_type: Type of document (POLICY, PROCEDURE, MANUAL, HR_OTHERS)
+        doc_type: Type of document (POLICY, PROCEDURE, MANUAL, HR, OTHERS)
         doc_ref: Unique reference code (e.g., POL-AML-001)
         title: Document title
         category: Category code (e.g., AML, GOV, OPS)
